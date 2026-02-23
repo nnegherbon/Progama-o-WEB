@@ -50,7 +50,8 @@ RNF05 – Deploy online simples
 RNF06 – Código organizado e documentado
 
 **Tecnologias Utilizadas**
-Backend
+
+Backend:
 
 Java 17
 Linguagem principal do projeto, utilizo ela para automação de testes no meu trabalho (Selenium)
@@ -61,7 +62,7 @@ Framework que simplifica a criação de APIs REST em Java, reduzindo configuraç
 Spring Data JPA
 Facilita o acesso ao banco de dados por meio de mapeamento objeto-relacional, permitindo que seja trabalhado com entidades.
 
-**Frontend**
+Frontend:
 
 HTML5
 Responsável pela estrutura das páginas web,.

@@ -3,17 +3,17 @@ Repositório referente as atividades da matéria de Programação WEB
 
 Aplicação Sistema Web de Organização Financeira Pessoal
 
-📌 Introdução
+**Introdução**
 
 Muitas pessoas enfrentam dificuldades para controlar suas finanças pessoais, acumulando dívidas e tendo pouco planejamento financeiro. A ausência de ferramentas simples e acessíveis contribui para o descontrole de gastos e dificuldade de poupar.
 
 Diante desse cenário, propõe-se o desenvolvimento de uma aplicação web de organização financeira pessoal que permita registrar e acompanhar receitas e despesas. A solução busca facilitar o controle financeiro e apoiar decisões mais conscientes, ao mesmo tempo em que possibilita aos alunos aplicar conhecimentos práticos de engenharia de software.
 
-Problema
+**Problema**
 
 Como auxiliar pessoas a organizarem suas finanças de forma simples, prática e acessível, permitindo o registro e acompanhamento de ganhos e gastos para melhor controle do saldo financeiro?
 
-Requisitos Funcionais (RF)
+**Requisitos Funcionais (RF)**
 
 RF01 – Cadastrar usuário
 RF02 – Autenticar usuário (login)
@@ -26,7 +26,7 @@ RF08 – Categorizar transações
 RF09 – Calcular saldo (ganhos – gastos)
 RF10 – Exibir resumo financeiro
 
-Requisitos Não Funcionais (RNF)
+**Requisitos Não Funcionais (RNF)**
 
 RNF01 – Aplicação web acessível via navegador
 RNF02 – Backend desenvolvido em Java
@@ -37,7 +37,7 @@ RNF06 – Versionamento em GitHub
 RNF07 – Deploy online simples
 RNF08 – Código organizado e documentado
 
-Tecnologias Utilizadas
+**Tecnologias Utilizadas**
 Backend
 
 Java 17
@@ -52,7 +52,7 @@ Facilita o acesso ao banco de dados por meio de mapeamento objeto-relacional, pe
 Spring Security + JWT
 Permite implementar autenticação e controle de acesso com token, atendendo requisitos modernos de segurança em aplicações web.
 
-Frontend
+**Frontend**
 
 HTML5
 Responsável pela estrutura das páginas web, sendo base essencial para qualquer aplicação frontend.
@@ -66,18 +66,18 @@ Permite interatividade e comunicação com a API backend por requisições HTTP.
 Bootstrap
 Framework CSS que acelera a criação de interfaces responsivas e organizadas, adequado ao nível dos alunos e reduzindo complexidade de design.
 
-Banco de Dados
+**Banco de Dados**
 
 PostgreSQL
 Banco de dados relacional robusto, gratuito e amplamente utilizado no mercado, adequado para armazenar dados financeiros estruturados com segurança e consistência.
 
-Testes
+**Testes**
 
 JUnit
 Framework padrão de testes em Java, utilizado para validar regras de negócio do sistema e garantir funcionamento correto das funcionalidades principais.
 
-Organização da Dupla
-Integrante 1
+**Organização da Dupla**
+Vinícius Clemente
 
 Desenvolvimento backend (API REST)
 
@@ -87,7 +87,7 @@ Regras de negócio
 
 Autenticação
 
-Integrante 2
+Bianca Barp
 
 Desenvolvimento frontend
 

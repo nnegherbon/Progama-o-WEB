@@ -77,7 +77,7 @@ JUnit
 Framework padrão de testes em Java, utilizado para validar regras de negócio do sistema e garantir funcionamento correto das funcionalidades principais.
 
 **Organização da Dupla**
-Vinícius Clemente
+1- Vinícius Clemente
 
 Desenvolvimento backend (API REST)
 
@@ -87,7 +87,7 @@ Regras de negócio
 
 Autenticação
 
-Bianca Barp
+2- Bianca Barp
 
 Desenvolvimento frontend
 

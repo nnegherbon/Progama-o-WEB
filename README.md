@@ -16,23 +16,37 @@ Como auxiliar pessoas a organizarem suas finanças de forma simples, prática e 
 **Requisitos Funcionais (RF)**
 
 RF01 – Cadastrar usuário
+
 RF02 – Autenticar usuário (login)
+
 RF03 – Registrar receita
+
 RF04 – Registrar despesa
+
 RF05 – Editar transação
+
 RF06 – Excluir transação
+
 RF07 – Listar transações do usuário
+
 RF08 – Categorizar transações
+
 RF09 – Calcular saldo (ganhos – gastos)
+
 RF10 – Exibir resumo financeiro
 
 **Requisitos Não Funcionais (RNF)**
 
 RNF01 – Aplicação web acessível via navegador
+
 RNF02 – Backend desenvolvido em Java
+
 RNF03 – API REST
+
 RNF04 – Versionamento em GitHub
+
 RNF05 – Deploy online simples
+
 RNF06 – Código organizado e documentado
 
 **Tecnologias Utilizadas**

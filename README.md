@@ -7,7 +7,7 @@ Aplicação Sistema Web de Organização Financeira Pessoal
 
 Muitas pessoas enfrentam dificuldades para controlar suas finanças pessoais, acumulando dívidas e tendo pouco planejamento financeiro. A ausência de ferramentas simples e acessíveis contribui para o descontrole de gastos e dificuldade de poupar.
 
-Diante desse cenário, propõe-se o desenvolvimento de uma aplicação web de organização financeira pessoal que permita registrar e acompanhar receitas e despesas. A solução busca facilitar o controle financeiro e apoiar decisões mais conscientes, ao mesmo tempo em que possibilita aos alunos aplicar conhecimentos práticos de engenharia de software.
+Diante desse cenário, propõe-se o desenvolvimento de uma aplicação web de organização financeira pessoal que permita registrar e acompanhar receitas e despesas. A solução busca facilitar o controle financeiro e apoiar decisões mais conscientes.
 
 **Problema**
 

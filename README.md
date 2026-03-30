@@ -105,3 +105,22 @@ Integração com API
 Interface do usuário
 
 Testes e documentação
+
+**Diagrama de componentes**
+
+<img width="942" height="1506" alt="c4_component_diagram" src="https://github.com/user-attachments/assets/3cd37713-f64b-4922-b845-f6481098c502" />
+
+
+📄 **Documentação Completa**
+
+Para uma análise mais aprofundada da arquitetura e dos detalhes técnicos do projeto, acesse o documento completo:
+
+[Documento de Arquitetura Monify](https://docs.google.com/document/d/1ZaJzMUKgUVz9wj3EP1fKhpSn_dyCboUW3S9pNngFXUU/edit?usp=sharing)
+
+
+🎨 **Protótipo da Interface**
+
+Explore o protótipo interativo da interface do usuário no Figma:
+
+[Protótipo Monify no Figma](https://www.figma.com/design/EiYtDYR6MdD2taJwpqnti3/Programa%C3%A7%C3%A3o-WEB---MONIFY?node-id=0-1&m=dev&t=7gMmlB6NqkY08yOj-1)
+

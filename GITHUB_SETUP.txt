@@ -1,0 +1,365 @@
+================================================================================
+                   MONIFY JAVA - SETUP GITHUB
+================================================================================
+
+Guia completo para versionar o projeto no GitHub.
+
+================================================================================
+                    PASSO 1: CRIAR REPOSITÓRIO NO GITHUB
+================================================================================
+
+1. Acesse: https://github.com/new
+
+2. Preencha:
+   - Repository name: monify-java
+   - Description: Sistema de Organização Financeira Pessoal em Java
+   - Visibility: Public (para apresentação)
+   - Initialize with README: NÃO (já temos)
+
+3. Clique em: Create repository
+
+4. Copie a URL do repositório (HTTPS ou SSH)
+
+================================================================================
+                    PASSO 2: CONFIGURAR GIT LOCALMENTE
+================================================================================
+
+Terminal, na pasta monify-java:
+
+   git config --global user.name "Seu Nome"
+   git config --global user.email "seu@email.com"
+
+Verifique:
+
+   git config --list
+
+================================================================================
+                    PASSO 3: INICIALIZAR REPOSITÓRIO
+================================================================================
+
+Terminal, na pasta monify-java:
+
+   git init
+
+   git add .
+
+   git commit -m "Initial commit: MONIFY Java - Sistema de Organização Financeira"
+
+================================================================================
+                   PASSO 4: ADICIONAR REMOTE REPOSITORY
+================================================================================
+
+Terminal:
+
+   git remote add origin https://github.com/seu-usuario/monify-java.git
+
+Verifique:
+
+   git remote -v
+
+Deve aparecer:
+   origin  https://github.com/seu-usuario/monify-java.git (fetch)
+   origin  https://github.com/seu-usuario/monify-java.git (push)
+
+================================================================================
+                      PASSO 5: FAZER PUSH
+================================================================================
+
+Terminal:
+
+   git branch -M main
+
+   git push -u origin main
+
+Se pedir autenticação:
+   - Use seu usuário do GitHub
+   - Use um Personal Access Token (não a senha)
+
+Como gerar Personal Access Token:
+   1. GitHub → Settings → Developer settings → Personal access tokens
+   2. Clique em: Generate new token
+   3. Selecione: repo (acesso completo a repositórios)
+   4. Clique em: Generate token
+   5. Copie o token
+   6. Use como senha no git push
+
+================================================================================
+                    PASSO 6: VERIFICAR NO GITHUB
+================================================================================
+
+1. Acesse: https://github.com/seu-usuario/monify-java
+
+2. Você verá:
+   - Todos os arquivos do projeto
+   - README.md
+   - Histórico de commits
+
+================================================================================
+                    WORKFLOW GIT RECOMENDADO
+================================================================================
+
+Para cada mudança:
+
+1. Faça as alterações no código
+
+2. Verifique o status:
+   git status
+
+3. Adicione os arquivos:
+   git add .
+
+4. Faça commit com mensagem descritiva:
+   git commit -m "Descrição clara da mudança"
+
+5. Faça push:
+   git push origin main
+
+Exemplos de mensagens:
+
+   git commit -m "Adicionar endpoint de relatório mensal"
+   git commit -m "Corrigir bug no cálculo de saldo"
+   git commit -m "Melhorar interface do dashboard"
+   git commit -m "Adicionar testes para TransactionService"
+
+================================================================================
+                    BRANCHES (Opcional)
+================================================================================
+
+Para trabalhar em features separadas:
+
+1. Criar branch:
+   git checkout -b feature/nova-funcionalidade
+
+2. Fazer mudanças e commits
+
+3. Fazer push da branch:
+   git push origin feature/nova-funcionalidade
+
+4. No GitHub, criar Pull Request
+
+5. Revisar e fazer merge para main
+
+================================================================================
+                    ARQUIVO .gitignore
+================================================================================
+
+Crie um arquivo .gitignore na raiz do projeto:
+
+   # Maven
+   target/
+   *.jar
+   *.war
+   
+   # IDE
+   .idea/
+   *.iml
+   .vscode/
+   
+   # Environment
+   .env
+   application-local.properties
+   
+   # OS
+   .DS_Store
+   Thumbs.db
+   
+   # Logs
+   *.log
+
+Depois:
+
+   git add .gitignore
+   git commit -m "Add .gitignore"
+   git push origin main
+
+================================================================================
+                    ESTRUTURA DE COMMITS
+================================================================================
+
+Commits bem organizados facilitam a apresentação:
+
+Exemplo de histórico:
+
+   Initial commit: MONIFY Java - Sistema de Organização Financeira
+   Add Spring Boot configuration
+   Implement User entity and repository
+   Implement Category entity and service
+   Implement Transaction entity and service
+   Add REST controllers for all entities
+   Implement frontend HTML/CSS/JavaScript
+   Add JUnit tests for TransactionService
+   Add database initialization
+   Update documentation
+
+Verifique o histórico:
+
+   git log --oneline
+
+================================================================================
+                    TAGS (Versões)
+================================================================================
+
+Para marcar versões importantes:
+
+   git tag -a v1.0.0 -m "Versão 1.0.0 - MVP"
+   git push origin v1.0.0
+
+Listar tags:
+
+   git tag
+
+================================================================================
+                    COLABORAÇÃO (Se trabalhar em dupla)
+================================================================================
+
+Vinícius (Backend):
+
+   git checkout -b backend/features
+   # Trabalhar no backend
+   git push origin backend/features
+   # Criar Pull Request no GitHub
+
+Bianca (Frontend):
+
+   git checkout -b frontend/features
+   # Trabalhar no frontend
+   git push origin frontend/features
+   # Criar Pull Request no GitHub
+
+Depois fazer merge para main.
+
+================================================================================
+                    CLONAR REPOSITÓRIO
+================================================================================
+
+Se alguém quiser clonar seu projeto:
+
+   git clone https://github.com/seu-usuario/monify-java.git
+   cd monify-java
+   mvn clean install
+   # Configurar application.properties
+   mvn spring-boot:run
+
+================================================================================
+                    COMANDOS GIT ÚTEIS
+================================================================================
+
+Ver status:
+   git status
+
+Ver histórico:
+   git log
+   git log --oneline
+   git log --graph --all --decorate
+
+Ver diferenças:
+   git diff
+   git diff --staged
+
+Desfazer mudanças:
+   git checkout -- arquivo.java
+   git reset HEAD~1
+
+Remover arquivo:
+   git rm arquivo.java
+   git commit -m "Remove arquivo"
+
+Renomear arquivo:
+   git mv arquivo_antigo.java arquivo_novo.java
+   git commit -m "Rename arquivo"
+
+================================================================================
+                    GITHUB PAGES (Opcional)
+================================================================================
+
+Para hospedar documentação:
+
+1. Vá para: Settings → Pages
+
+2. Em "Source", selecione: main branch
+
+3. Clique em: Save
+
+4. Crie pasta: docs/
+
+5. Adicione arquivos HTML/Markdown
+
+6. Seu site estará em: https://seu-usuario.github.io/monify-java
+
+================================================================================
+                    GITHUB ACTIONS (Opcional)
+================================================================================
+
+Para testes automáticos, crie arquivo:
+
+   .github/workflows/maven.yml
+
+Conteúdo:
+
+   name: Java CI with Maven
+
+   on: [push, pull_request]
+
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       steps:
+       - uses: actions/checkout@v2
+       - name: Set up JDK 17
+         uses: actions/setup-java@v2
+         with:
+           java-version: '17'
+       - name: Build with Maven
+         run: mvn clean install
+       - name: Run tests
+         run: mvn test
+
+Agora, a cada push, os testes rodam automaticamente!
+
+================================================================================
+                    CHECKLIST ANTES DE APRESENTAR
+================================================================================
+
+   ☐ Todos os arquivos estão no repositório
+   ☐ README.md está completo e atualizado
+   ☐ PROFESSOR_SETUP.txt está claro
+   ☐ Código está bem comentado
+   ☐ Testes estão passando (mvn test)
+   ☐ Aplicação roda sem erros (mvn spring-boot:run)
+   ☐ Histórico de commits está limpo
+   ☐ .gitignore está configurado
+   ☐ Não há dados sensíveis no repositório
+   ☐ Repositório é público
+
+================================================================================
+                    APRESENTAÇÃO NO GITHUB
+================================================================================
+
+Dicas para impressionar:
+
+1. README bem estruturado com:
+   - Descrição do projeto
+   - Requisitos atendidos
+   - Como rodar
+   - Estrutura do projeto
+   - Tecnologias utilizadas
+
+2. Commits com mensagens claras
+
+3. Código bem organizado e comentado
+
+4. Testes com boa cobertura
+
+5. Documentação completa
+
+6. Sem arquivos desnecessários
+
+================================================================================
+                    DESENVOLVIDO COM ❤️ PARA A FACULDADE
+================================================================================
+
+Dúvidas sobre Git/GitHub?
+   - GitHub Docs: https://docs.github.com/
+   - Git Documentation: https://git-scm.com/doc
+
+Boa apresentação! 🚀

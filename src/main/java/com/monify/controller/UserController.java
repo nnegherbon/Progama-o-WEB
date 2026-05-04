@@ -1,7 +1,14 @@
 package com.monify.controller;
 
 import com.monify.dto.UserDTO;
+<<<<<<< HEAD
 import com.monify.dto.LoginDTO;
+=======
+<<<<<<< HEAD
+import com.monify.dto.LoginDTO;
+=======
+>>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
+>>>>>>> 041d07d18f59eff65c5d638cc57de8a68ecbb642
 import com.monify.entity.User;
 import com.monify.service.UserService;
 import jakarta.validation.Valid;
@@ -39,9 +46,24 @@ public class UserController {
     }
 
     @PostMapping("/login")
+<<<<<<< HEAD
     public ResponseEntity<?> loginUser(@Valid @RequestBody LoginDTO loginDTO) {
         try {
             User user = userService.authenticateUser(loginDTO.getEmail(), loginDTO.getPassword());
+=======
+<<<<<<< HEAD
+    public ResponseEntity<?> loginUser(@Valid @RequestBody LoginDTO loginDTO) {
+        try {
+            User user = userService.authenticateUser(loginDTO.getEmail(), loginDTO.getPassword());
+=======
+    public ResponseEntity<?> loginUser(@RequestBody Map<String, String> credentials) {
+        try {
+            String email = credentials.get("email");
+            String password = credentials.get("password");
+
+            User user = userService.authenticateUser(email, password);
+>>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
+>>>>>>> 041d07d18f59eff65c5d638cc57de8a68ecbb642
             Map<String, Object> response = new HashMap<>();
             response.put("id", user.getId());
             response.put("email", user.getEmail());

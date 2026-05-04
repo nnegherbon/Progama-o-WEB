@@ -47,10 +47,13 @@ public class CategoryService {
             createCategory("Educação", "📚", "#6C5CE7");
             createCategory("Utilidades", "💡", "#FDCB6E");
             createCategory("Outros", "📌", "#95A5A6");
+<<<<<<< HEAD
             createCategory("Moradia", "🏠", "#2ECC71");
             createCategory("Compras", "🛍️", "#9B59B6");
             createCategory("Investimentos", "📈", "#F1C40F");
             createCategory("Presentes", "🎁", "#E74C3C");
+=======
+>>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
         }
     }
 }

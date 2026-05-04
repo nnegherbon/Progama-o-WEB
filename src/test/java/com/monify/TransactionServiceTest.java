@@ -132,8 +132,11 @@ public class TransactionServiceTest {
         assertEquals(new BigDecimal("150.50"), summary.getTotalExpense());
         assertEquals(new BigDecimal("849.50"), summary.getBalance());
         assertEquals(2L, summary.getTransactionCount());
+<<<<<<< HEAD
         assertNotNull(summary.getExpensesByCategory());
         assertEquals(1, summary.getExpensesByCategory().size());
+=======
+>>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
     }
 
     @Test

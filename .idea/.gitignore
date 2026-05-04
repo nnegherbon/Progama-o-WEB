@@ -26,3 +26,7 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+
+#arq
+.idea/workspace.xml

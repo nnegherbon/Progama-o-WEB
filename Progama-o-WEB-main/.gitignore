@@ -1,0 +1,46 @@
+target/
+*.class
+*.log
+.idea/
+.vscode/
+.DS_Store
+
+# Maven wrapper temporary files
+.mvn/wrapper/maven-wrapper.jar
+
+# OS and editor files
+Thumbs.db
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+
+# Build artifacts
+*.jar
+*.war
+*.ear
+
+!.mvn/wrapper/maven-wrapper.jar
+
+### IntelliJ IDEA ###
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.project
+.classpath
+.settings/
+
+### NetBeans ###
+/nbproject/private/
+/build/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/

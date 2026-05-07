@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MONIFY - Organização Financeira</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="navbar-brand">
+                <h1>💰 MONIFY</h1>
+            </div>
+            <div class="navbar-menu">
+                <button class="nav-btn active" onclick="showSection('dashboard')">Dashboard</button>
+                <button class="nav-btn" onclick="showSection('transactions')">Transações</button>
+                <button class="nav-btn" onclick="logout()">Sair</button>
+            </div>
+        </nav>
+
+        <!-- Auth Section -->
+        <div id="auth-section" class="section active">
+            <div class="auth-container">
+                <div class="auth-box">
+                    <h2>Bem-vindo ao MONIFY</h2>
+                    <p>Sistema de Organização Financeira Pessoal</p>
+
+                    <div class="auth-tabs">
+                        <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+                        <button class="tab-btn" onclick="switchTab('register')">Cadastro</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="login-form" class="auth-form active">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="login-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input type="password" id="login-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Entrar</button>
+                    </form>
+
+                    <!-- Register Form -->
+                    <form id="register-form" class="auth-form">
+                        <div class="form-group">
+                            <label>Nome</label>
+                            <input type="text" id="register-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="register-email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input type="password" id="register-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Cadastrar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="section">
+            <div class="dashboard-header">
+                <h2>Dashboard Financeiro</h2>
+                <button class="btn btn-success" onclick="showSection('transactions')">+ Nova Transação</button>
+            </div>
+
+            <div class="summary-cards">
+                <div class="card">
+                    <div class="card-icon">💵</div>
+                    <div class="card-content">
+                        <h3>Saldo Total</h3>
+                        <p id="balance" class="amount">R$ 0,00</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📈</div>
+                    <div class="card-content">
+                        <h3>Total de Receitas</h3>
+                        <p id="income" class="amount income">R$ 0,00</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📉</div>
+                    <div class="card-content">
+                        <h3>Total de Despesas</h3>
+                        <p id="expense" class="amount expense">R$ 0,00</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recent-transactions">
+                <h3>Transações Recentes</h3>
+                <div id="recent-list" class="transaction-list">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Section -->
+        <div id="transactions-section" class="section">
+            <div class="transactions-header">
+                <h2>Gerenciar Transações</h2>
+            </div>
+
+            <div class="transactions-container">
+                <!-- Form -->
+                <div class="form-container">
+                    <h3>Registrar Nova Transação</h3>
+                    <form id="transaction-form">
+                        <div class="form-group">
+                            <label>Tipo</label>
+                            <select id="type" required>
+                                <option value="">Selecione o tipo</option>
+                                <option value="INCOME">Receita</option>
+                                <option value="EXPENSE">Despesa</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Categoria</label>
+                            <select id="category" required>
+                                <option value="">Selecione a categoria</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Valor</label>
+                            <input type="number" id="amount" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Descrição</label>
+                            <input type="text" id="description" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Data</label>
+                            <input type="date" id="date" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Registrar Transação</button>
+                    </form>
+                </div>
+
+                <!-- Filters and List -->
+                <div class="list-container">
+                    <h3>Suas Transações</h3>
+                    <div class="filters">
+                        <select id="filter-type" onchange="loadTransactions()">
+                            <option value="">Todos os tipos</option>
+                            <option value="INCOME">Receitas</option>
+                            <option value="EXPENSE">Despesas</option>
+                        </select>
+                        <select id="filter-category" onchange="loadTransactions()">
+                            <option value="">Todas as categorias</option>
+                        </select>
+                    </div>
+                    <div id="transactions-list" class="transaction-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

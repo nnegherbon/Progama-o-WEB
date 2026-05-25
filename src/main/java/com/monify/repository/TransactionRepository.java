@@ -33,19 +33,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     @Query("SELECT t FROM Transaction t WHERE t.user.id = :userId AND t.date BETWEEN :startDate AND :endDate ORDER BY t.date DESC")
     List<Transaction> findByUserIdAndDateRange(@Param("userId") Long userId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 041d07d18f59eff65c5d638cc57de8a68ecbb642
+
 
     @Query("SELECT t.category.name, SUM(t.amount) FROM Transaction t WHERE t.user.id = :userId AND t.type = 'EXPENSE' GROUP BY t.category.name")
     List<Object[]> getExpensesByCategory(@Param("userId") Long userId);
 
     @Query("SELECT t.type, SUM(t.amount) FROM Transaction t WHERE t.user.id = :userId GROUP BY t.type")
     List<Object[]> getTotalsByType(@Param("userId") Long userId);
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
->>>>>>> 041d07d18f59eff65c5d638cc57de8a68ecbb642
 }

@@ -103,7 +103,6 @@ public class TransactionService {
         BigDecimal totalExpense = transactionRepository.getTotalExpense(userId);
         Long transactionCount = transactionRepository.getTransactionCount(userId);
 
-<<<<<<< HEAD
         totalIncome = (totalIncome != null) ? totalIncome : BigDecimal.ZERO;
         totalExpense = (totalExpense != null) ? totalExpense : BigDecimal.ZERO;
 
@@ -119,36 +118,13 @@ public class TransactionService {
             }
         }
 
-=======
-        totalIncome = totalIncome != null ? totalIncome : BigDecimal.ZERO;
-        totalExpense = totalExpense != null ? totalExpense : BigDecimal.ZERO;
-
-        BigDecimal balance = totalIncome.subtract(totalExpense);
-
-<<<<<<< HEAD
-        java.util.Map<String, BigDecimal> expensesByCategory = new java.util.HashMap<>();
-        List<Object[]> results = transactionRepository.getExpensesByCategory(userId);
-        for (Object[] result : results) {
-            expensesByCategory.put((String) result[0], (BigDecimal) result[1]);
-        }
-
-=======
->>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
->>>>>>> 041d07d18f59eff65c5d638cc57de8a68ecbb642
         return FinancialSummaryDTO.builder()
                 .totalIncome(totalIncome)
                 .totalExpense(totalExpense)
                 .balance(balance)
                 .transactionCount(transactionCount != null ? transactionCount : 0L)
                 .userId(userId)
-<<<<<<< HEAD
                 .expensesByCategory(expensesByCategory)
-=======
-<<<<<<< HEAD
-                .expensesByCategory(expensesByCategory)
-=======
->>>>>>> 734c5886e2e7b9d518ddc0e41a88a84bef51d50f
->>>>>>> 041d07d18f59eff65c5d638cc57de8a68ecbb642
                 .build();
     }
 

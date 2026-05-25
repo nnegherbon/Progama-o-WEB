@@ -4,117 +4,227 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MONIFY - Organização Financeira</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Navigation -->
+
+    <!-- ===== AUTH PAGE ===== -->
+    <div id="auth-page">
+        <!-- Navbar minimal no login -->
         <nav class="navbar">
-            <div class="navbar-brand">
-                <h1>💰 MONIFY</h1>
-            </div>
-            <div class="navbar-menu">
-                <button class="nav-btn active" onclick="showSection('dashboard')">Dashboard</button>
-                <button class="nav-btn" onclick="showSection('transactions')">Transações</button>
-                <button class="nav-btn" onclick="logout()">Sair</button>
-            </div>
+            <div class="navbar-brand">MONIFY</div>
         </nav>
 
-        <!-- Auth Section -->
-        <div id="auth-section" class="section active">
-            <div class="auth-container">
-                <div class="auth-box">
-                    <h2>Bem-vindo ao MONIFY</h2>
-                    <p>Sistema de Organização Financeira Pessoal</p>
+        <div class="auth-wrapper">
+            <!-- Left panel: branding -->
+            <div class="auth-left">
+                <div class="auth-left-content">
+                    <div class="brand-logo">M</div>
+                    <h1 class="brand-title">MONIFY</h1>
+                    <p class="brand-subtitle">Organização Financeira Pessoal</p>
+                    <ul class="brand-features">
+                        <li><span class="feat-icon">◈</span> Controle de receitas e despesas</li>
+                        <li><span class="feat-icon">◈</span> Relatórios detalhados</li>
+                        <li><span class="feat-icon">◈</span> Limites de gastos inteligentes</li>
+                        <li><span class="feat-icon">◈</span> Lançamentos organizados</li>
+                    </ul>
+                </div>
+            </div>
 
+            <!-- Right panel: form -->
+            <div class="auth-right">
+                <div class="auth-box">
                     <div class="auth-tabs">
                         <button class="tab-btn active" onclick="switchTab('login')">Login</button>
                         <button class="tab-btn" onclick="switchTab('register')">Cadastro</button>
                     </div>
 
                     <!-- Login Form -->
-                    <form id="login-form" class="auth-form active">
+                    <form id="login-form" class="auth-form active" onsubmit="handleLogin(event)">
+                        <div class="form-welcome">
+                            <h2>Bem-vindo de volta</h2>
+                            <p>Acesse sua conta MONIFY</p>
+                        </div>
                         <div class="form-group">
                             <label>Email</label>
-                            <input type="email" id="login-email" required>
+                            <input type="email" id="login-email" placeholder="seu@email.com" required>
                         </div>
                         <div class="form-group">
                             <label>Senha</label>
-                            <input type="password" id="login-password" required>
+                            <input type="password" id="login-password" placeholder="••••••••" required>
                         </div>
                         <button type="submit" class="btn btn-primary">Entrar</button>
+                        <p class="switch-hint">Não tem conta? <a onclick="switchTab('register')">Cadastre-se</a></p>
                     </form>
 
                     <!-- Register Form -->
-                    <form id="register-form" class="auth-form">
+                    <form id="register-form" class="auth-form" onsubmit="handleRegister(event)">
+                        <div class="form-welcome">
+                            <h2>Criar conta</h2>
+                            <p>Comece a organizar suas finanças</p>
+                        </div>
                         <div class="form-group">
                             <label>Nome</label>
-                            <input type="text" id="register-name" required>
+                            <input type="text" id="register-name" placeholder="Seu nome completo" required>
                         </div>
                         <div class="form-group">
                             <label>Email</label>
-                            <input type="email" id="register-email" required>
+                            <input type="email" id="register-email" placeholder="seu@email.com" required>
                         </div>
                         <div class="form-group">
                             <label>Senha</label>
-                            <input type="password" id="register-password" required>
+                            <input type="password" id="register-password" placeholder="••••••••" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Cadastrar</button>
+                        <button type="submit" class="btn btn-primary">Criar conta</button>
+                        <p class="switch-hint">Já tem conta? <a onclick="switchTab('login')">Faça login</a></p>
                     </form>
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- ===== MAIN APP ===== -->
+    <div id="app-page" style="display:none;">
+        <nav class="navbar navbar-app">
+            <div class="navbar-brand">MONIFY</div>
+            <div class="navbar-menu">
+                <button class="nav-btn active" onclick="showSection('dashboard', event)">home</button>
+                <button class="nav-btn" onclick="showSection('transactions', event)">lançamentos</button>
+                <button class="nav-btn" onclick="showSection('reports', event)">relatórios</button>
+                <button class="nav-btn" onclick="showSection('limits', event)">limites</button>
+            </div>
+            <div class="navbar-actions">
+                <button class="icon-btn" title="Configurações">⚙</button>
+                <button class="icon-btn profile-btn" onclick="logout()" title="Sair">👤</button>
+            </div>
+        </nav>
 
         <!-- Dashboard Section -->
-        <div id="dashboard-section" class="section">
-            <div class="dashboard-header">
-                <h2>Dashboard Financeiro</h2>
-                <button class="btn btn-success" onclick="showSection('transactions')">+ Nova Transação</button>
+        <div id="dashboard-section" class="section active">
+            <!-- Hero card -->
+            <div class="hero-card">
+                <div class="hero-greeting">
+                    <span id="greeting-time">Boa noite,</span>
+                    <strong id="greeting-name">Usuário!</strong>
+                </div>
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <span class="stat-label">Receitas no mês atual</span>
+                        <span class="stat-value income" id="hero-income">R$ 0,00</span>
+                    </div>
+                    <div class="hero-divider"></div>
+                    <div class="hero-stat">
+                        <span class="stat-label">Despesas no mês atual</span>
+                        <span class="stat-value expense" id="hero-expense">R$ 0,00</span>
+                    </div>
+                    <div class="hero-chart-icon">📊</div>
+                </div>
+                <div class="hero-quick">
+                    <span class="quick-label">Acesso rápido</span>
+                    <div class="quick-btns">
+                        <button class="quick-btn" onclick="showSection('transactions', event)">
+                            <span class="quick-icon">⊖</span>
+                            <span>Despesa</span>
+                        </button>
+                        <button class="quick-btn" onclick="showSection('transactions', event)">
+                            <span class="quick-icon">⊕</span>
+                            <span>Receita</span>
+                        </button>
+                        <button class="quick-btn">
+                            <span class="quick-icon">⊛</span>
+                            <span>Transf.</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <div class="summary-cards">
-                <div class="card">
-                    <div class="card-icon">💵</div>
-                    <div class="card-content">
-                        <h3>Saldo Total</h3>
-                        <p id="balance" class="amount">R$ 0,00</p>
+            <!-- Grid cards -->
+            <div class="dashboard-grid">
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title">
+                            <div class="card-accent"></div>
+                            <span>Saldo Geral</span>
+                        </div>
+                        <button class="card-chevron">︿</button>
+                    </div>
+                    <div class="dash-card-body">
+                        <span id="balance" class="dash-amount">R$ 0,00</span>
+                        <button class="eye-btn">👁</button>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-icon">📈</div>
-                    <div class="card-content">
-                        <h3>Total de Receitas</h3>
-                        <p id="income" class="amount income">R$ 0,00</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon">📉</div>
-                    <div class="card-content">
-                        <h3>Total de Despesas</h3>
-                        <p id="expense" class="amount expense">R$ 0,00</p>
-                    </div>
-                </div>
-            </div>
 
-            <div class="recent-transactions">
-                <h3>Transações Recentes</h3>
-                <div id="recent-list" class="transaction-list">
-                    <!-- Populated by JavaScript -->
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title">
+                            <div class="card-accent"></div>
+                            <span>Todas as Faturas</span>
+                        </div>
+                        <button class="card-chevron">︿</button>
+                    </div>
+                    <div class="dash-card-body">
+                        <span class="dash-amount">R$ 0,00</span>
+                        <button class="eye-btn">👁</button>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span>Contas a pagar</span></div>
+                        <button class="card-chevron">︿</button>
+                    </div>
+                    <div class="dash-card-body empty-card">
+                        <span class="empty-hint">Nenhuma conta pendente</span>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span>Contas a receber</span></div>
+                        <button class="card-chevron">︿</button>
+                    </div>
+                    <div class="dash-card-body empty-card">
+                        <span class="empty-hint">Nenhuma conta pendente</span>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span>Maiores gastos do mês atual</span></div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button class="card-chevron">⚙</button>
+                            <button class="card-chevron">︿</button>
+                        </div>
+                    </div>
+                    <div class="dash-card-body empty-card">
+                        <span class="empty-hint">Nenhum lançamento</span>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <div class="dash-card-title"><span>Limites de gastos (mês corrente)</span></div>
+                        <button class="card-chevron">︿</button>
+                    </div>
+                    <div class="dash-card-body empty-card">
+                        <span class="empty-hint">Sem limites configurados</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Transactions Section -->
         <div id="transactions-section" class="section">
-            <div class="transactions-header">
-                <h2>Gerenciar Transações</h2>
+            <div class="section-header">
+                <h2>Lançamentos</h2>
             </div>
-
             <div class="transactions-container">
-                <!-- Form -->
-                <div class="form-container">
+                <div class="form-container dash-card">
                     <h3>Registrar Nova Transação</h3>
-                    <form id="transaction-form">
+                    <form id="transaction-form" onsubmit="handleCreateTransaction(event)">
                         <div class="form-group">
                             <label>Tipo</label>
                             <select id="type" required>
@@ -141,12 +251,11 @@
                             <label>Data</label>
                             <input type="date" id="date" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Registrar Transação</button>
+                        <button type="submit" class="btn btn-primary">Registrar</button>
                     </form>
                 </div>
 
-                <!-- Filters and List -->
-                <div class="list-container">
+                <div class="list-container dash-card">
                     <h3>Suas Transações</h3>
                     <div class="filters">
                         <select id="filter-type" onchange="loadTransactions()">
@@ -158,11 +267,21 @@
                             <option value="">Todas as categorias</option>
                         </select>
                     </div>
-                    <div id="transactions-list" class="transaction-list">
-                        <!-- Populated by JavaScript -->
-                    </div>
+                    <div id="transactions-list" class="transaction-list"></div>
                 </div>
             </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div id="reports-section" class="section">
+            <div class="section-header"><h2>Relatórios</h2></div>
+            <div class="dash-card" style="padding:3rem;text-align:center;color:#888;">Em desenvolvimento</div>
+        </div>
+
+        <!-- Limits Section -->
+        <div id="limits-section" class="section">
+            <div class="section-header"><h2>Limites</h2></div>
+            <div class="dash-card" style="padding:3rem;text-align:center;color:#888;">Em desenvolvimento</div>
         </div>
     </div>
 

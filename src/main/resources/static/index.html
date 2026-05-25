@@ -89,8 +89,18 @@
             <button class="nav-btn" onclick="showSection('limites',event)">limites</button>
         </div>
         <div class="navbar-actions">
-            <button class="icon-btn" title="Configurações">⚙</button>
-            <button class="icon-btn" onclick="logout()" title="Sair">👤</button>
+            <div class="profile-menu">
+                <button class="icon-btn" id="settings-menu-btn" onclick="openProfileModal()" title="Configurações"></button>
+                <button class="icon-btn" id="profile-menu-btn" onclick="toggleProfileMenu()" title="Perfil"></button>
+                <div id="profile-dropdown" class="profile-dropdown">
+                    <div class="profile-summary">
+                        <strong id="profile-user-name">Usuário</strong>
+                        <span id="profile-user-email"></span>
+                    </div>
+                    <button onclick="openProfileModal()">Configurações</button>
+                    <button onclick="logout()">Logout</button>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -122,9 +132,6 @@
                     <button class="quick-btn" onclick="openQuickAdd('INCOME')">
                         <span class="quick-icon">⊕</span><span>Receita</span>
                     </button>
-                    <button class="quick-btn">
-                        <span class="quick-icon">⊛</span><span>Transf.</span>
-                    </button>
                 </div>
             </div>
         </div>
@@ -136,7 +143,7 @@
                     <div class="dash-card-title">
                         <div class="card-accent"></div>
                         <span>Saldo Geral</span>
-                        <button class="eye-btn" onclick="toggleVisibility('balance-val')">👁</button>
+                        <button class="eye-btn" onclick="toggleVisibility('balance-val')" type="button"></button>
                     </div>
                     <button class="card-chevron" onclick="toggleCard('saldo-body',this)">︿</button>
                 </div>
@@ -144,11 +151,8 @@
                     <div class="dash-amount-row">
                         <span id="balance-val" class="dash-amount">R$ 0,00</span>
                     </div>
-                    <div class="card-empty-state">
-                        <span class="card-empty-icon">$</span>
-                        <p>Adicione sua primeira conta</p>
-                    </div>
-                    <button class="manage-btn">Gerenciar contas</button>
+                    <div id="accounts-list"></div>
+                    <button class="manage-btn" onclick="openAccountsModal()">Gerenciar contas</button>
                 </div>
             </div>
 
@@ -158,7 +162,7 @@
                     <div class="dash-card-title">
                         <div class="card-accent"></div>
                         <span>Todas as Faturas</span>
-                        <button class="eye-btn" onclick="toggleVisibility('faturas-val')">👁</button>
+                        <button class="eye-btn" onclick="toggleVisibility('faturas-val')" type="button"></button>
                     </div>
                     <button class="card-chevron" onclick="toggleCard('faturas-body',this)">︿</button>
                 </div>
@@ -167,11 +171,8 @@
                         <span id="faturas-val" class="dash-amount">R$ 0,00</span>
                     </div>
                     <p class="subsection-title">Meus cartões</p>
-                    <div class="card-empty-state">
-                        <span class="card-empty-icon card-icon-sm">💳</span>
-                        <p>Adicione o seu primeiro cartão</p>
-                    </div>
-                    <button class="manage-btn">Gerenciar cartões</button>
+                    <div id="cards-list"></div>
+                    <button class="manage-btn" onclick="openCardsModal()">Adicionar cartão</button>
                 </div>
             </div>
 
@@ -251,6 +252,9 @@
                     <button class="month-btn" onclick="changeMonth(1,'lanc')">›</button>
                 </div>
                 <div class="page-header-actions">
+                    <button class="btn btn-primary-dark compact-action" onclick="openTransactionModalFromLancamentos('INCOME')" type="button">Receita</button>
+                    <button class="btn btn-primary-dark compact-action" onclick="openTransactionModalFromLancamentos('EXPENSE')" type="button">Despesa</button>
+                    <button class="btn btn-primary-dark compact-action" title="Pesquisar" onclick="toggleLancSearch()" type="button">Pesquisar</button>
                     <button class="icon-btn-dark" title="Filtros">⊟</button>
                     <button class="icon-btn-dark" title="Mais opções">⋮</button>
                 </div>
@@ -266,9 +270,6 @@
                         <label><input type="checkbox" value="receitas-nao-recebidas"> Receitas não recebidas</label>
                         <label><input type="checkbox" value="despesas"> Despesas</label>
                         <label><input type="checkbox" value="despesas-pagas"> Despesas pagas</label>
-                        <label><input type="checkbox" value="transferencias"> Transferências</label>
-                        <label><input type="checkbox" value="transferencias-pagas"> Transferências pagas</label>
-                        <label><input type="checkbox" value="transferencias-nao-pagas"> Transferências não pagas</label>
                         <label><input type="checkbox" value="fixos"> Lançamentos fixos</label>
                         <label><input type="checkbox" value="parcelados"> Lançamentos parcelados</label>
                     </div>
@@ -308,6 +309,9 @@
                     </div>
                 </div>
                 <button class="filter-search-btn">🔍</button>
+                <div id="lanc-search-box" class="lanc-search-box" style="display:none;">
+                    <input type="search" id="lanc-search-input" placeholder="Pesquisar lançamentos..." oninput="applyLancSearch()">
+                </div>
             </div>
 
             <div class="lanc-list-area" id="lanc-list">
@@ -428,6 +432,22 @@
             </div>
 
             <div id="lim-entradas" class="page-tab-content">
+                <form class="inline-limit-form" onsubmit="handleAddIncomeLimit(event)">
+                    <div class="form-group">
+                        <label>Entrada</label>
+                        <input type="text" id="lim-income-name" placeholder="Salário, freelance..." required>
+                    </div>
+                    <div class="form-group">
+                        <label>Valor esperado (R$)</label>
+                        <input type="number" id="lim-income-value" step="0.01" min="0" placeholder="0,00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Mês</label>
+                        <input type="month" id="lim-income-month" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary-dark">Salvar entrada</button>
+                </form>
+                <div id="lim-entradas-list"></div>
                 <div class="page-empty-state">
                     <div class="empty-icon-circle">!</div>
                     <p>Nenhum dado disponível</p>
@@ -517,6 +537,99 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeLimitModal()">Cancelar</button>
                 <button type="submit" class="btn btn-primary-dark">Salvar limite</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== ACCOUNTS MODAL ===== -->
+<div id="accounts-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3>Gerenciar Contas</h3>
+            <button class="modal-close" onclick="closeAccountsModal()">x</button>
+        </div>
+        <form onsubmit="handleAddAccount(event)">
+            <div class="form-group">
+                <label>Nome</label>
+                <input type="text" id="account-name" placeholder="Conta principal" required>
+            </div>
+            <div class="form-group">
+                <label>Tipo</label>
+                <select id="account-type" required>
+                    <option value="CHECKING">Conta corrente</option>
+                    <option value="SAVINGS">Poupança</option>
+                    <option value="CASH">Dinheiro</option>
+                    <option value="INVESTMENT">Investimento</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Saldo</label>
+                <input type="number" id="account-balance" step="0.01" placeholder="0,00" required>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary-dark">Adicionar conta</button>
+            </div>
+        </form>
+        <div id="accounts-modal-list" class="modal-list"></div>
+    </div>
+</div>
+
+<!-- ===== CARDS MODAL ===== -->
+<div id="cards-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3>Adicionar Cartão</h3>
+            <button class="modal-close" onclick="closeCardsModal()">x</button>
+        </div>
+        <form onsubmit="handleAddCard(event)">
+            <div class="form-group">
+                <label>Nome do cartão</label>
+                <input type="text" id="card-name" placeholder="Nubank, Inter..." required>
+            </div>
+            <div class="form-group">
+                <label>Limite</label>
+                <input type="number" id="card-limit" step="0.01" min="0" placeholder="0,00" required>
+            </div>
+            <div class="form-group">
+                <label>Final</label>
+                <input type="text" id="card-last-four" maxlength="4" pattern="[0-9]{4}" placeholder="1234" required>
+            </div>
+            <div class="form-group">
+                <label>Bandeira</label>
+                <input type="text" id="card-brand" placeholder="Visa, Mastercard..." required>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary-dark">Adicionar cartão</button>
+            </div>
+        </form>
+        <div id="cards-modal-list" class="modal-list"></div>
+    </div>
+</div>
+
+<!-- ===== PROFILE MODAL ===== -->
+<div id="profile-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3>Configurações</h3>
+            <button class="modal-close" onclick="closeProfileModal()">x</button>
+        </div>
+        <form onsubmit="handleProfileUpdate(event)">
+            <div class="form-group">
+                <label>Nome</label>
+                <input type="text" id="profile-name" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="profile-email" required>
+            </div>
+            <div class="profile-info">
+                <span>Dados do usuário autenticado</span>
+                <strong id="profile-user-name-modal"></strong>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeProfileModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary-dark">Salvar</button>
             </div>
         </form>
     </div>

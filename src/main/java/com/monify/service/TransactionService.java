@@ -136,7 +136,7 @@ public class TransactionService {
                 .collect(Collectors.toList());
     }
 
-    private TransactionDTO convertToDTO(Transaction transaction) {
+    public TransactionDTO convertToDTO(Transaction transaction) {
         return TransactionDTO.builder()
                 .id(transaction.getId())
                 .amount(transaction.getAmount())

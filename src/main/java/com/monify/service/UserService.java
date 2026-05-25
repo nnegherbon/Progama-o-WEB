@@ -1,6 +1,7 @@
 package com.monify.service;
 
 import com.monify.dto.UserDTO;
+import com.monify.dto.ProfileDTO;
 import com.monify.entity.User;
 import com.monify.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,19 @@ public class UserService {
     public User updateUser(Long id, UserDTO userDTO) {
         User user = getUserById(id);
         user.setName(userDTO.getName());
+        return userRepository.save(user);
+    }
+
+    public User updateProfile(Long id, ProfileDTO profileDTO) {
+        User user = getUserById(id);
+        userRepository.findByEmail(profileDTO.getEmail())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Email ja cadastrado");
+                });
+
+        user.setName(profileDTO.getName());
+        user.setEmail(profileDTO.getEmail());
         return userRepository.save(user);
     }
 

@@ -2,6 +2,7 @@ package com.monify.controller;
 
 import com.monify.dto.UserDTO;
 import com.monify.dto.LoginDTO;
+import com.monify.dto.ProfileDTO;
 import com.monify.entity.User;
 import com.monify.service.UserService;
 import jakarta.validation.Valid;
@@ -84,9 +85,9 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id, @Valid @RequestBody UserDTO userDTO) {
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @Valid @RequestBody ProfileDTO profileDTO) {
         try {
-            User user = userService.updateUser(id, userDTO);
+            User user = userService.updateProfile(id, profileDTO);
             Map<String, Object> response = new HashMap<>();
             response.put("id", user.getId());
             response.put("email", user.getEmail());

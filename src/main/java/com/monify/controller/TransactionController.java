@@ -27,7 +27,7 @@ public class TransactionController {
     public ResponseEntity<?> createTransaction(@RequestParam Long userId, @Valid @RequestBody TransactionDTO transactionDTO) {
         try {
             Transaction transaction = transactionService.createTransaction(userId, transactionDTO);
-            return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
+            return ResponseEntity.status(HttpStatus.CREATED).body(transactionService.convertToDTO(transaction));
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());
@@ -39,7 +39,7 @@ public class TransactionController {
     public ResponseEntity<?> getTransactionById(@PathVariable Long id) {
         try {
             Transaction transaction = transactionService.getTransactionById(id);
-            return ResponseEntity.ok(transaction);
+            return ResponseEntity.ok(transactionService.convertToDTO(transaction));
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());
@@ -101,7 +101,7 @@ public class TransactionController {
     public ResponseEntity<?> updateTransaction(@PathVariable Long id, @Valid @RequestBody TransactionDTO transactionDTO) {
         try {
             Transaction transaction = transactionService.updateTransaction(id, transactionDTO);
-            return ResponseEntity.ok(transaction);
+            return ResponseEntity.ok(transactionService.convertToDTO(transaction));
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());

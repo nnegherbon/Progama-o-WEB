@@ -45,20 +45,23 @@ public class CategoryService {
     }
 
     public void initializeDefaultCategories() {
-        if (categoryRepository.count() == 0) {
-            createCategory("Alimentação", "🍔", "#FF6B6B");
-            createCategory("Transporte", "🚗", "#4ECDC4");
-            createCategory("Saúde", "🏥", "#45B7D1");
-            createCategory("Lazer", "🎮", "#FFA07A");
-            createCategory("Salário", "💰", "#98D8C8");
-            createCategory("Educação", "📚", "#6C5CE7");
-            createCategory("Utilidades", "💡", "#FDCB6E");
-            createCategory("Outros", "📌", "#95A5A6");
+        ensureDefaultCategory("Alimentação", "🍔", "#FF6B6B");
+        ensureDefaultCategory("Transporte", "🚗", "#4ECDC4");
+        ensureDefaultCategory("Saúde", "🏥", "#45B7D1");
+        ensureDefaultCategory("Lazer", "🎮", "#FFA07A");
+        ensureDefaultCategory("Salário", "💰", "#98D8C8");
+        ensureDefaultCategory("Educação", "📚", "#6C5CE7");
+        ensureDefaultCategory("Utilidades", "💡", "#FDCB6E");
+        ensureDefaultCategory("Outros", "📌", "#95A5A6");
+        ensureDefaultCategory("Moradia", "🏠", "#2ECC71");
+        ensureDefaultCategory("Compras", "🛍️", "#9B59B6");
+        ensureDefaultCategory("Investimentos", "📈", "#F1C40F");
+        ensureDefaultCategory("Presentes", "🎁", "#E74C3C");
+    }
 
-            createCategory("Moradia", "🏠", "#2ECC71");
-            createCategory("Compras", "🛍️", "#9B59B6");
-            createCategory("Investimentos", "📈", "#F1C40F");
-            createCategory("Presentes", "🎁", "#E74C3C");
+    private void ensureDefaultCategory(String name, String icon, String color) {
+        if (categoryRepository.findByName(name).isEmpty()) {
+            createCategory(name, icon, color);
         }
     }
 }

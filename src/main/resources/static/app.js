@@ -164,11 +164,27 @@ async function fetchAllTransactions() {
 async function loadCategories() {
     try {
         const res = await fetch(`${API_BASE_URL}/categories`);
+        if (!res.ok) throw new Error('Não foi possível carregar as categorias');
         const data = await res.json();
-        categories = Array.isArray(data) ? data : [];
-        populateLancamentoCategoryFilters();
-        populateReportFilterOptions();
-    } catch(e) { console.error(e); categories = []; }
+        categories = Array.isArray(data)
+            ? data.filter(category =>
+                Number.isInteger(Number(category.id)) &&
+                String(category.name || '').trim()
+            )
+            : [];
+    } catch(e) {
+        console.error(e);
+        categories = [];
+    } finally {
+        syncCategoryConsumers();
+    }
+}
+
+function syncCategoryConsumers() {
+    populateModalCategories();
+    populateLancamentoCategoryFilters();
+    populateReportFilterOptions();
+    populateLimitCategories();
 }
 
 async function fetchAccounts() {
@@ -656,6 +672,10 @@ function openQuickAdd(type) {
     const dateEl = document.getElementById('q-date');
     if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
     populateModalCategories();
+    if (!categories.length) {
+        alert('Nenhuma categoria disponível. Atualize a página e tente novamente.');
+        return;
+    }
     if (form) form.dataset.mode = 'create';
     document.getElementById('quick-modal').style.display = 'flex';
 }
@@ -672,6 +692,10 @@ function openTransactionModalFromLancamentos(type) {
 function openEditTransaction(id) {
     const transaction = allTransactions.find(t => Number(t.id) === Number(id));
     if (!transaction) return;
+    if (!categories.some(category => Number(category.id) === Number(transaction.categoryId))) {
+        alert('A categoria deste lançamento não está mais disponível.');
+        return;
+    }
     editingTransactionId = id;
     document.getElementById('q-type').value = transaction.type;
     document.getElementById('q-amount').value = transaction.amount;
@@ -689,8 +713,20 @@ function populateModalCategories() {
     const sel = document.getElementById('q-category');
     if (!sel) return;
     sel.innerHTML = '';
-    const source = categories.length ? categories : [{ id: 1, name: 'Outros', icon: '' }];
-    source.forEach(c => {
+    const submitButton = document.getElementById('transaction-submit-button');
+    const hasCategories = categories.length > 0;
+    sel.disabled = !hasCategories;
+    if (submitButton) submitButton.disabled = !hasCategories;
+
+    if (!hasCategories) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Nenhuma categoria disponível';
+        sel.appendChild(option);
+        return;
+    }
+
+    categories.forEach(c => {
         const o = document.createElement('option');
         o.value = c.id;
         o.textContent = `${c.icon || ''} ${c.name}`.trim();
@@ -704,11 +740,12 @@ function populateLancamentoCategoryFilters() {
     const selected = new Set(
         Array.from(menu.querySelectorAll('input:checked')).map(input => input.value)
     );
+    const options = categories.map(category => {
+        const value = `category:${category.id}`;
+        return `<label><input type="checkbox" value="${value}" ${selected.has(value) ? 'checked' : ''}> ${escapeHtml(`${category.icon || ''} ${category.name}`.trim())}</label>`;
+    }).join('');
     menu.innerHTML = '<p class="dd-group-label">Categorias cadastradas</p>' +
-        categories.map(category => {
-            const value = `category:${category.id}`;
-            return `<label><input type="checkbox" value="${value}" ${selected.has(value) ? 'checked' : ''}> ${escapeHtml(`${category.icon || ''} ${category.name}`.trim())}</label>`;
-        }).join('');
+        (options || '<p class="filter-loading">Nenhuma categoria disponível</p>');
 }
 
 document.addEventListener('change', e => {
@@ -730,6 +767,10 @@ async function handleQuickAdd(e) {
     const description = document.getElementById('q-description').value;
     const date = document.getElementById('q-date').value;
     const categoryId = parseInt(document.getElementById('q-category').value, 10);
+    if (!categories.some(category => Number(category.id) === categoryId)) {
+        alert('Selecione uma categoria válida.');
+        return;
+    }
     try {
         const url = editingTransactionId
             ? `${API_BASE_URL}/transactions/${editingTransactionId}`
@@ -764,7 +805,9 @@ function closeModalOutside(e) {
 // ===== LANÇAMENTOS =====
 function getFilteredTransactions() {
     const m = monthState.lanc;
+    const validCategoryIds = new Set(categories.map(category => Number(category.id)));
     return allTransactions.filter(t => {
+        if (!validCategoryIds.has(Number(t.categoryId))) return false;
         const d = parseLocalDate(t.date);
         if (d.getMonth() !== m.getMonth() || d.getFullYear() !== m.getFullYear()) return false;
         if (lancSearchTerm) {
@@ -920,11 +963,13 @@ function getReportMonthTransactions() {
 }
 
 function filterReportTransactions(transactions) {
+    const validCategoryIds = new Set(categories.map(category => Number(category.id)));
     return transactions.filter(transaction => {
+        const availableCategory = validCategoryIds.has(Number(transaction.categoryId));
         const typeMatch = reportFilters.types.has(transaction.type);
         const categoryMatch = !reportFilters.categoryIds.size ||
             reportFilters.categoryIds.has(Number(transaction.categoryId));
-        return typeMatch && categoryMatch;
+        return availableCategory && typeMatch && categoryMatch;
     });
 }
 
@@ -1089,11 +1134,12 @@ function populateReportFilterOptions() {
     const container = document.getElementById('rel-filter-categories');
     if (!container) return;
     const allSelected = reportFilters.categoryIds.size === 0;
-    container.innerHTML = categories.map(category => `
+    const options = categories.map(category => `
         <label class="modal-check">
             <input type="checkbox" value="${category.id}" ${allSelected || reportFilters.categoryIds.has(Number(category.id)) ? 'checked' : ''}>
             <span>${escapeHtml(`${category.icon || ''} ${category.name}`.trim())}</span>
         </label>`).join('');
+    container.innerHTML = options || '<p class="modal-empty">Nenhuma categoria disponível</p>';
 }
 
 function openReportFiltersModal() {
@@ -1109,6 +1155,10 @@ function closeReportFiltersModal() {
 }
 
 function applyReportFilters() {
+    if (!categories.length) {
+        alert('Não foi possível carregar as categorias.');
+        return;
+    }
     const types = new Set();
     if (document.getElementById('rel-filter-income').checked) types.add('INCOME');
     if (document.getElementById('rel-filter-expense').checked) types.add('EXPENSE');
@@ -1120,6 +1170,10 @@ function applyReportFilters() {
     const selectedCategories = Array.from(
         document.querySelectorAll('#rel-filter-categories input:checked')
     ).map(input => Number(input.value));
+    if (!selectedCategories.length) {
+        alert('Selecione ao menos uma categoria.');
+        return;
+    }
     reportFilters.types = types;
     reportFilters.categoryIds = selectedCategories.length === categories.length
         ? new Set()

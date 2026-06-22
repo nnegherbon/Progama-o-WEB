@@ -1,5 +1,6 @@
 package com.monify.controller;
 
+import com.monify.dto.CategoryDTO;
 import com.monify.entity.Category;
 import com.monify.service.CategoryService;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,10 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<?> getAllCategories() {
-        List<Category> categories = categoryService.getAllCategories();
+    public ResponseEntity<List<CategoryDTO>> getAllCategories() {
+        List<CategoryDTO> categories = categoryService.getAllCategories().stream()
+                .map(CategoryDTO::from)
+                .toList();
         return ResponseEntity.ok(categories);
     }
 
@@ -28,7 +31,7 @@ public class CategoryController {
     public ResponseEntity<?> getCategoryById(@PathVariable Long id) {
         try {
             Category category = categoryService.getCategoryById(id);
-            return ResponseEntity.ok(category);
+            return ResponseEntity.ok(CategoryDTO.from(category));
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());
@@ -44,7 +47,7 @@ public class CategoryController {
             String color = request.get("color");
 
             Category category = categoryService.createCategory(name, icon, color);
-            return ResponseEntity.status(HttpStatus.CREATED).body(category);
+            return ResponseEntity.status(HttpStatus.CREATED).body(CategoryDTO.from(category));
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());

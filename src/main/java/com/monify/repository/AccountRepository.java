@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface AccountRepository extends JpaRepository<Account, Long> {
     List<Account> findByUserIdOrderByNameAsc(Long userId);
     Optional<Account> findByUserIdAndNameIgnoreCase(Long userId, String name);
+    Optional<Account> findByIdAndUserId(Long id, Long userId);
 }

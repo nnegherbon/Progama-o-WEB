@@ -4,6 +4,7 @@ import com.monify.dto.AccountDTO;
 import com.monify.entity.Account;
 import com.monify.entity.User;
 import com.monify.repository.AccountRepository;
+import com.monify.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
     private final UserService userService;
 
     public List<AccountDTO> getAccountsByUserId(Long userId) {
@@ -45,12 +47,22 @@ public class AccountService {
     }
 
     public void deleteAccount(Long userId, Long id) {
-        Account account = accountRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Conta nao encontrada"));
-        if (!account.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Conta nao pertence ao usuario");
+        Account account = getOwnedAccount(userId, id);
+        if (transactionRepository.existsByAccountId(id)) {
+            throw new RuntimeException("A conta possui lancamentos vinculados e nao pode ser excluida");
         }
         accountRepository.delete(account);
+    }
+
+    public Account getOwnedAccount(Long userId, Long id) {
+        return accountRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new RuntimeException("Conta nao encontrada para o usuario"));
+    }
+
+    public void adjustBalance(Long userId, Long id, BigDecimal amount) {
+        Account account = getOwnedAccount(userId, id);
+        account.setBalance(account.getBalance().add(amount));
+        accountRepository.save(account);
     }
 
     private AccountDTO toDTO(Account account) {

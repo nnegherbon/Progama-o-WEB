@@ -80,7 +80,15 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<?> getAllUsers() {
-        List<User> users = userService.getAllUsers();
+        List<Map<String, Object>> users = userService.getAllUsers().stream()
+                .map(user -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("id", user.getId());
+                    item.put("email", user.getEmail());
+                    item.put("name", user.getName());
+                    return item;
+                })
+                .toList();
         return ResponseEntity.ok(users);
     }
 

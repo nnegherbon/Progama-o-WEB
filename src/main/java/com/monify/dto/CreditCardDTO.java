@@ -23,6 +23,8 @@ public class CreditCardDTO {
     @NotNull(message = "Limite e obrigatorio")
     private BigDecimal limitAmount;
 
+    private BigDecimal usedAmount;
+
     @NotBlank(message = "Final do cartao e obrigatorio")
     @Pattern(regexp = "\\d{4}", message = "Final deve conter 4 digitos")
     private String lastFour;

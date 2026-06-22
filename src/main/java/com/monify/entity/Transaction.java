@@ -34,6 +34,22 @@ public class Transaction {
     @Column(nullable = false)
     private LocalDate date;
 
+    @Enumerated(EnumType.STRING)
+    private TransactionPeriodicity periodicity;
+
+    @Enumerated(EnumType.STRING)
+    private TransactionStatus status;
+
+    @Column(name = "settled_at")
+    private LocalDateTime settledAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origin_type")
+    private MovementOrigin originType;
+
+    @Column(name = "recurrence_key", length = 36)
+    private String recurrenceKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -48,10 +64,24 @@ public class Transaction {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id")
+    private Account account;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "credit_card_id")
+    private CreditCard creditCard;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+        if (this.periodicity == null) {
+            this.periodicity = TransactionPeriodicity.SINGLE;
+        }
+        if (this.status == null) {
+            this.status = TransactionStatus.PENDING;
+        }
     }
 
     @PreUpdate
@@ -72,5 +102,31 @@ public class Transaction {
         public String getDisplayName() {
             return displayName;
         }
+    }
+
+    public enum TransactionPeriodicity {
+        SINGLE("Unico"),
+        MONTHLY("Mensal"),
+        ANNUAL("Anual");
+
+        private final String displayName;
+
+        TransactionPeriodicity(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
+
+    public enum TransactionStatus {
+        PENDING,
+        COMPLETED
+    }
+
+    public enum MovementOrigin {
+        ACCOUNT,
+        CREDIT_CARD
     }
 }

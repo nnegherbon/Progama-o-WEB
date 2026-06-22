@@ -47,6 +47,15 @@ body {
     font-size:1.15rem; font-weight:700; letter-spacing:0.12em;
     color:var(--text-light); text-transform:uppercase; flex-shrink:0;
 }
+.navbar-brand-button {
+    padding:0;
+    border:0;
+    background:none;
+    font-family:var(--font);
+    cursor:pointer;
+}
+.navbar-brand-button:hover { color:#fff; }
+.navbar-brand-button:focus-visible { outline:2px solid #fff; outline-offset:5px; border-radius:2px; }
 .navbar-menu { display:flex; gap:2.5rem; flex:1; justify-content:center; }
 .nav-btn {
     background:none; border:none; color:rgba(255,255,255,0.5);
@@ -296,6 +305,20 @@ body {
 .pagar-item-name { font-weight:600; color:#222; }
 .pagar-item-sub { font-size:0.75rem; color:var(--muted); }
 .pagar-item-amount { font-weight:700; color:var(--red); }
+.pagar-item-actions { display:flex; align-items:center; gap:0.45rem; flex-shrink:0; }
+.settle-btn {
+    padding:0.32rem 0.55rem;
+    border:1px solid rgba(20,161,12,0.28);
+    border-radius:6px;
+    background:rgba(20,161,12,0.08);
+    color:var(--green);
+    font-family:var(--font);
+    font-size:0.72rem;
+    font-weight:700;
+    cursor:pointer;
+}
+.settle-btn.expense { border-color:rgba(207,4,4,0.22); background:rgba(207,4,4,0.06); color:var(--red); }
+.settle-btn:hover { filter:brightness(0.95); }
 .pagar-overdue-banner {
     background: var(--danger-soft); color: var(--red);
     font-size:0.82rem; font-weight:700; text-align:center;
@@ -957,6 +980,7 @@ body {
     color:var(--text-dark);
 }
 .modal-box .form-group input::placeholder { color:#999; }
+.form-help { display:block; min-height:1rem; margin-top:0.25rem; color:#666; font-size:0.72rem; }
 .modal-list { margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(0,0,0,0.08); }
 .modal-empty { color:#666; font-size:0.86rem; text-align:center; padding:0.6rem 0; }
 .profile-info {
@@ -987,6 +1011,8 @@ body {
     .lanc-item { align-items:flex-start; flex-wrap:wrap; }
     .lanc-item-info { min-width:180px; }
     .lanc-actions { width:100%; justify-content:flex-end; }
+    .pagar-item { flex-wrap:wrap; }
+    .pagar-item-actions { width:100%; justify-content:flex-end; }
     .report-category-grid,
     .report-charts-grid { grid-template-columns:1fr; }
     .report-summary-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }

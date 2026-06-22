@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface CreditCardRepository extends JpaRepository<CreditCard, Long> {
     List<CreditCard> findByUserIdOrderByNameAsc(Long userId);
     Optional<CreditCard> findByUserIdAndNameIgnoreCase(Long userId, String name);
+    Optional<CreditCard> findByIdAndUserId(Long id, Long userId);
 }

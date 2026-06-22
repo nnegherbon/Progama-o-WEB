@@ -109,6 +109,18 @@ public class TransactionController {
         }
     }
 
+    @PatchMapping("/{id}/settle")
+    public ResponseEntity<?> settleTransaction(@PathVariable Long id, @RequestParam Long userId) {
+        try {
+            Transaction transaction = transactionService.settleTransaction(userId, id);
+            return ResponseEntity.ok(transactionService.convertToDTO(transaction));
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteTransaction(@PathVariable Long id) {
         try {

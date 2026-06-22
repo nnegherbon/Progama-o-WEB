@@ -33,6 +33,16 @@ public class TransactionDTO {
     @NotNull(message = "Data é obrigatória")
     private LocalDate date;
 
+    private Transaction.TransactionPeriodicity periodicity;
+
+    private Transaction.TransactionStatus status;
+
+    private Transaction.MovementOrigin originType;
+
+    private Long accountId;
+
+    private Long creditCardId;
+
     @NotNull(message = "Categoria é obrigatória")
     private Long categoryId;
 
@@ -46,4 +56,7 @@ public class TransactionDTO {
     private String categoryName;
     private String categoryIcon;
     private String categoryColor;
+    private String originName;
+    private String originDescription;
+    private LocalDateTime settledAt;
 }

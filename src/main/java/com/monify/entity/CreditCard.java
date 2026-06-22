@@ -28,6 +28,9 @@ public class CreditCard {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal limitAmount;
 
+    @Column(name = "used_amount", precision = 12, scale = 2)
+    private BigDecimal usedAmount;
+
     @Column(nullable = false, length = 4)
     private String lastFour;
 
@@ -46,6 +49,9 @@ public class CreditCard {
         this.createdAt = LocalDateTime.now();
         if (this.limitAmount == null) {
             this.limitAmount = BigDecimal.ZERO;
+        }
+        if (this.usedAmount == null) {
+            this.usedAmount = BigDecimal.ZERO;
         }
     }
 }

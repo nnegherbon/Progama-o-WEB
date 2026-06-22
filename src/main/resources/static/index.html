@@ -81,7 +81,7 @@
 <!-- ===================== APP PAGE ===================== -->
 <div id="app-page" style="display:none;">
     <nav class="navbar navbar-app">
-        <div class="navbar-brand">MONIFY</div>
+        <button class="navbar-brand navbar-brand-button" type="button" onclick="goHome()" aria-label="Ir para a tela inicial">MONIFY</button>
         <div class="navbar-menu">
             <button class="nav-btn active" onclick="showSection('dashboard',event)">home</button>
             <button class="nav-btn" onclick="showSection('lancamentos',event)">lançamentos</button>
@@ -229,7 +229,7 @@
             <!-- Limites -->
             <div class="dash-card">
                 <div class="dash-card-header">
-                    <div class="dash-card-title"><span>Limites de gastos do X (apresentar mês corrente)</span></div>
+                    <div class="dash-card-title"><span id="dashboard-limits-title">Limites de gastos</span></div>
                     <button class="card-chevron" onclick="toggleCard('limites-body',this)">︿</button>
                 </div>
                 <div id="limites-body" class="dash-card-body expanded">
@@ -412,6 +412,26 @@
                 <select id="q-category"></select>
             </div>
             <div class="form-group">
+                <label>Periodicidade</label>
+                <select id="q-periodicity" required>
+                    <option value="SINGLE">Unico</option>
+                    <option value="MONTHLY">Mensal</option>
+                    <option value="ANNUAL">Anual</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Situacao</label>
+                <select id="q-status" required>
+                    <option value="COMPLETED">Efetivado</option>
+                    <option value="PENDING">Pendente</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Origem da movimentacao</label>
+                <select id="q-origin" required></select>
+                <small class="form-help" id="q-origin-help"></small>
+            </div>
+            <div class="form-group">
                 <label>Valor</label>
                 <input type="number" id="q-amount" step="0.01" min="0" placeholder="0,00" required>
             </div>
@@ -478,6 +498,10 @@
         <div class="report-filter-section">
             <span class="report-filter-title">Categorias cadastradas</span>
             <div id="rel-filter-categories" class="report-filter-categories"></div>
+        </div>
+        <div class="report-filter-section">
+            <span class="report-filter-title">Origem da movimentacao</span>
+            <div id="rel-filter-origins" class="report-filter-categories"></div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-outline" onclick="clearReportFilters()">Limpar</button>
@@ -579,6 +603,6 @@
     </div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=20260622-2"></script>
 </body>
 </html>

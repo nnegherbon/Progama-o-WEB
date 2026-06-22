@@ -18,7 +18,8 @@ let lancSearchTerm = '';
 let currentPeriod = 'diario';
 const reportFilters = {
     types: new Set(['INCOME', 'EXPENSE']),
-    categoryIds: new Set()
+    categoryIds: new Set(),
+    originKeys: new Set()
 };
 
 const monthState = { lanc: new Date(), rel: new Date(), lim: new Date() };
@@ -49,6 +50,10 @@ function renderMonthLabels() {
         const el = document.getElementById(`${k}-month-label`);
         if (el) el.textContent = `${MONTHS[monthState[k].getMonth()]} ${monthState[k].getFullYear()}`;
     });
+    const dashboardLimitsTitle = document.getElementById('dashboard-limits-title');
+    if (dashboardLimitsTitle) {
+        dashboardLimitsTitle.textContent = `Limites de gastos de ${MONTHS[new Date().getMonth()]}`;
+    }
 }
 
 function changeMonth(dir, key) {
@@ -222,10 +227,16 @@ function showSection(section, event) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     const target = event && event.target ? event.target : null;
     if (target && target.classList.contains('nav-btn')) target.classList.add('active');
+    else if (section === 'dashboard') document.querySelector('.nav-btn')?.classList.add('active');
     if (section === 'dashboard') loadDashboard();
     if (section === 'lancamentos') loadLancamentos();
     if (section === 'relatorios') loadRelatorios();
     if (section === 'limites') renderLimites();
+}
+
+function goHome() {
+    closeProfileMenu();
+    showSection('dashboard', { target: document.querySelector('.nav-btn') });
 }
 
 // ===== DASHBOARD =====
@@ -239,7 +250,7 @@ async function loadDashboard() {
     ]);
 
     const now = new Date();
-    const monthTx = allTransactions.filter(t => {
+    const monthTx = allTransactions.filter(t => isTransactionCompleted(t)).filter(t => {
         const d = parseLocalDate(t.date);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
@@ -253,12 +264,12 @@ async function loadDashboard() {
     setElText('balance-val', formatCurrency(balance));
     setElText('hero-income', formatCurrency(income));
     setElText('hero-expense', formatCurrency(expense));
-    setElText('faturas-val', formatCurrency(creditCards.reduce((total, card) => total + Number(card.limitAmount || 0), 0)));
+    setElText('faturas-val', formatCurrency(creditCards.reduce((total, card) => total + Number(card.usedAmount || 0), 0)));
 
     renderAccountsCard();
     renderCardsCard();
-    renderContasPagar();
-    renderContasReceber();
+    renderPendingPayables();
+    renderPendingReceivables();
     renderGastosCard();
     renderLimitesCard();
 }
@@ -366,7 +377,7 @@ function renderCardsCard() {
         <div class="credit-card-number">**** **** **** ${escapeHtml(card.lastFour)}</div>
         <div class="credit-card-row">
             <span>${escapeHtml(card.name)}</span>
-            <strong>${formatCurrency(card.limitAmount)}</strong>
+            <strong>${formatCurrency(card.usedAmount || 0)} / ${formatCurrency(card.limitAmount)}</strong>
         </div>
         <button class="mini-action card-delete" onclick="deleteCreditCard(${card.id})" title="Excluir cartao">x</button>
     </div>`).join('');
@@ -405,7 +416,7 @@ function renderCardsModalList() {
     if (!list) return;
     list.innerHTML = creditCards.length ? creditCards.map(card => `<div class="modal-list-item">
         <span>${escapeHtml(card.name)} <small>${escapeHtml(card.brand)} final ${escapeHtml(card.lastFour)}</small></span>
-        <strong>${formatCurrency(card.limitAmount)}</strong>
+        <strong>${formatCurrency(card.usedAmount || 0)} / ${formatCurrency(card.limitAmount)}</strong>
         <button type="button" class="mini-action danger" onclick="deleteCreditCard(${card.id})">x</button>
     </div>`).join('') : '<p class="modal-empty">Nenhum cartao cadastrado.</p>';
 }
@@ -581,6 +592,92 @@ function renderContasReceber() {
 }
 
 // ===== MAIORES GASTOS CARD =====
+function renderPendingPayables() {
+    const body = document.getElementById('pagar-body');
+    if (!body) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const pending = allTransactions
+        .filter(transaction => transaction.type === 'EXPENSE' && !isTransactionCompleted(transaction))
+        .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+
+    if (!pending.length) {
+        body.innerHTML = '<div class="card-empty-state alone"><p>No momento voce nao possui contas a pagar</p></div>' +
+            '<button class="manage-btn" onclick="openQuickAdd(\'EXPENSE\',true)">Cadastrar conta a pagar</button>';
+        return;
+    }
+
+    const overdueCount = pending.filter(transaction => parseLocalDate(transaction.date) < today).length;
+    const banner = overdueCount
+        ? `<div class="pagar-overdue-banner">Contas a pagar atrasadas (${overdueCount})</div>`
+        : '';
+    body.innerHTML = banner + pending.map(transaction => {
+        const overdue = parseLocalDate(transaction.date) < today;
+        return buildPendingItem(transaction, overdue, 'Pagar');
+    }).join('') + '<button class="manage-btn" onclick="openQuickAdd(\'EXPENSE\',true)">Cadastrar conta a pagar</button>';
+}
+
+function renderPendingReceivables() {
+    const body = document.getElementById('receber-body');
+    if (!body) return;
+    const pending = allTransactions
+        .filter(transaction => transaction.type === 'INCOME' && !isTransactionCompleted(transaction))
+        .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date))
+        .slice(0, 4);
+
+    if (!pending.length) {
+        body.innerHTML = '<div class="card-empty-state alone"><p>No momento voce nao possui contas a receber pendentes</p></div>' +
+            '<button class="manage-btn" onclick="openQuickAdd(\'INCOME\',true)">Cadastrar conta a receber</button>';
+        return;
+    }
+
+    body.innerHTML = pending.map(transaction => buildPendingItem(transaction, false, 'Receber')).join('') +
+        '<button class="manage-btn" onclick="openQuickAdd(\'INCOME\',true)">Cadastrar conta a receber</button>';
+}
+
+function buildPendingItem(transaction, overdue, actionLabel) {
+    const isExpense = transaction.type === 'EXPENSE';
+    const dateLabel = isExpense ? 'Venc.' : 'Prev.';
+    const amountColor = isExpense ? overdue ? 'var(--red)' : '#f59e0b' : 'var(--green)';
+    return `<div class="pagar-item ${isExpense ? '' : 'income-item'}">
+        <div class="pagar-item-icon">${escapeHtml(transaction.categoryIcon || '-')}</div>
+        <div class="pagar-item-info">
+            <div class="pagar-item-name">${escapeHtml(transaction.description)}</div>
+            <div class="pagar-item-sub">${escapeHtml(transaction.categoryName || '')} - ${escapeHtml(transaction.originDescription || 'Origem nao informada')} - ${dateLabel} ${formatDate(transaction.date)}</div>
+        </div>
+        <div class="pagar-item-actions">
+            <div class="pagar-item-amount" style="color:${amountColor}">${formatCurrency(transaction.amount)}</div>
+            <button class="settle-btn ${isExpense ? 'expense' : ''}" type="button" onclick="settleTransaction(${transaction.id})">${actionLabel}</button>
+        </div>
+    </div>`;
+}
+
+async function settleTransaction(id) {
+    const transaction = allTransactions.find(item => Number(item.id) === Number(id));
+    if (!transaction) return;
+    if (!transaction.accountId && !transaction.creditCardId) {
+        alert('Selecione a origem da movimentacao antes de efetivar o lancamento.');
+        openEditTransaction(id);
+        return;
+    }
+
+    const action = transaction.type === 'INCOME' ? 'receber' : 'pagar';
+    if (!confirm(`Deseja ${action} ${transaction.description}?`)) return;
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/transactions/${id}/settle?userId=${currentUser.id}`,
+            { method: 'PATCH' }
+        );
+        if (!response.ok) throw await response.json();
+        await Promise.all([fetchAllTransactions(), fetchAccounts(), fetchCreditCards()]);
+        await loadDashboard();
+        renderLancamentos();
+        loadRelatorios();
+    } catch (error) {
+        alert('Erro: ' + (error.error || error.message || 'nao foi possivel efetivar o lancamento'));
+    }
+}
+
 function renderGastosCard() {
     const ctx = document.getElementById('gastosChart');
     const listEl = document.getElementById('gastos-list');
@@ -589,7 +686,7 @@ function renderGastosCard() {
 
     const now = new Date();
     const expenses = allTransactions.filter(t => {
-        if (t.type !== 'EXPENSE') return false;
+        if (t.type !== 'EXPENSE' || !isTransactionCompleted(t)) return false;
         const d = parseLocalDate(t.date);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
@@ -661,17 +758,20 @@ function renderLimitesCard() {
 }
 
 // ===== QUICK ADD MODAL =====
-function openQuickAdd(type) {
+function openQuickAdd(type, pending = false) {
     editingTransactionId = null;
     const form = document.getElementById('quick-modal').querySelector('form');
     if (form) form.reset();
     const typeEl = document.getElementById('q-type');
     if (typeEl) typeEl.value = type;
+    document.getElementById('q-periodicity').value = 'SINGLE';
+    document.getElementById('q-status').value = pending ? 'PENDING' : 'COMPLETED';
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = type === 'EXPENSE' ? 'Nova Despesa' : 'Nova Receita';
     const dateEl = document.getElementById('q-date');
     if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
     populateModalCategories();
+    populateMovementOrigins();
     if (!categories.length) {
         alert('Nenhuma categoria disponível. Atualize a página e tente novamente.');
         return;
@@ -701,8 +801,14 @@ function openEditTransaction(id) {
     document.getElementById('q-amount').value = transaction.amount;
     document.getElementById('q-description').value = transaction.description;
     document.getElementById('q-date').value = transaction.date;
+    document.getElementById('q-periodicity').value = transaction.periodicity || 'SINGLE';
+    document.getElementById('q-status').value = transaction.status || 'COMPLETED';
     populateModalCategories();
     document.getElementById('q-category').value = transaction.categoryId;
+    const originValue = transaction.accountId
+        ? `ACCOUNT:${transaction.accountId}`
+        : transaction.creditCardId ? `CREDIT_CARD:${transaction.creditCardId}` : '';
+    populateMovementOrigins(originValue);
     document.getElementById('modal-title').textContent = 'Editar Lançamento';
     const form = document.getElementById('quick-modal').querySelector('form');
     if (form) form.dataset.mode = 'edit';
@@ -713,16 +819,15 @@ function populateModalCategories() {
     const sel = document.getElementById('q-category');
     if (!sel) return;
     sel.innerHTML = '';
-    const submitButton = document.getElementById('transaction-submit-button');
     const hasCategories = categories.length > 0;
     sel.disabled = !hasCategories;
-    if (submitButton) submitButton.disabled = !hasCategories;
 
     if (!hasCategories) {
         const option = document.createElement('option');
         option.value = '';
         option.textContent = 'Nenhuma categoria disponível';
         sel.appendChild(option);
+        syncTransactionSubmitAvailability();
         return;
     }
 
@@ -732,6 +837,52 @@ function populateModalCategories() {
         o.textContent = `${c.icon || ''} ${c.name}`.trim();
         sel.appendChild(o);
     });
+    syncTransactionSubmitAvailability();
+}
+
+function populateMovementOrigins(selectedValue = '') {
+    const select = document.getElementById('q-origin');
+    if (!select) return;
+    const type = document.getElementById('q-type')?.value || 'EXPENSE';
+    const accountOptions = accounts
+        .filter(account => account.type === 'CHECKING' || account.type === 'SAVINGS')
+        .map(account => ({
+            value: `ACCOUNT:${account.id}`,
+            label: `${formatAccountType(account.type)} - ${account.name}`
+        }));
+    const cardOptions = type === 'EXPENSE'
+        ? creditCards.map(card => ({
+            value: `CREDIT_CARD:${card.id}`,
+            label: `Cartao de credito - ${card.name} final ${card.lastFour}`
+        }))
+        : [];
+    const options = [...accountOptions, ...cardOptions];
+
+    select.innerHTML = options.length
+        ? '<option value="">Selecione a origem</option>' + options.map(option =>
+            `<option value="${option.value}">${escapeHtml(option.label)}</option>`
+        ).join('')
+        : '<option value="">Cadastre uma conta compativel primeiro</option>';
+    select.disabled = !options.length;
+    if (selectedValue && options.some(option => option.value === selectedValue)) {
+        select.value = selectedValue;
+    }
+    const help = document.getElementById('q-origin-help');
+    if (help) {
+        help.textContent = options.length
+            ? type === 'INCOME'
+                ? 'Receitas podem ser creditadas em conta corrente ou poupanca.'
+                : 'Despesas podem sair de uma conta ou utilizar um cartao.'
+            : 'Crie uma conta corrente, poupanca ou cartao no Dashboard.';
+    }
+    syncTransactionSubmitAvailability();
+}
+
+function syncTransactionSubmitAvailability() {
+    const button = document.getElementById('transaction-submit-button');
+    const category = document.getElementById('q-category');
+    const origin = document.getElementById('q-origin');
+    if (button) button.disabled = !category || category.disabled || !origin || origin.disabled;
 }
 
 function populateLancamentoCategoryFilters() {
@@ -749,7 +900,10 @@ function populateLancamentoCategoryFilters() {
 }
 
 document.addEventListener('change', e => {
-    if (e.target && e.target.id === 'q-type') populateModalCategories();
+    if (e.target && e.target.id === 'q-type') {
+        populateModalCategories();
+        populateMovementOrigins();
+    }
     if (e.target && e.target.closest('.lanc-filters')) renderLancamentos();
 });
 
@@ -766,11 +920,23 @@ async function handleQuickAdd(e) {
     const amount = parseFloat(document.getElementById('q-amount').value);
     const description = document.getElementById('q-description').value;
     const date = document.getElementById('q-date').value;
+    const periodicity = document.getElementById('q-periodicity').value;
+    const status = document.getElementById('q-status').value;
+    const originValue = document.getElementById('q-origin').value;
     const categoryId = parseInt(document.getElementById('q-category').value, 10);
     if (!categories.some(category => Number(category.id) === categoryId)) {
         alert('Selecione uma categoria válida.');
         return;
     }
+    if (!originValue || !Number.isFinite(amount) || amount <= 0) {
+        alert('Informe um valor valido e selecione a origem da movimentacao.');
+        return;
+    }
+    const [originType, originIdValue] = originValue.split(':');
+    const originId = Number(originIdValue);
+    const originPayload = originType === 'ACCOUNT'
+        ? { originType, accountId: originId, creditCardId: null }
+        : { originType, accountId: null, creditCardId: originId };
     try {
         const url = editingTransactionId
             ? `${API_BASE_URL}/transactions/${editingTransactionId}`
@@ -778,7 +944,16 @@ async function handleQuickAdd(e) {
         const res = await fetch(url, {
             method: editingTransactionId ? 'PUT' : 'POST',
             headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ type, categoryId, amount, description, date })
+            body: JSON.stringify({
+                type,
+                categoryId,
+                amount,
+                description,
+                date,
+                periodicity,
+                status,
+                ...originPayload
+            })
         });
         if (res.ok) {
             closeQuickModal();
@@ -811,7 +986,7 @@ function getFilteredTransactions() {
         const d = parseLocalDate(t.date);
         if (d.getMonth() !== m.getMonth() || d.getFullYear() !== m.getFullYear()) return false;
         if (lancSearchTerm) {
-            const haystack = normalizeText(`${t.description || ''} ${t.categoryName || ''} ${t.type || ''}`);
+            const haystack = normalizeText(`${t.description || ''} ${t.categoryName || ''} ${t.type || ''} ${t.originName || ''} ${t.originDescription || ''} ${getPeriodicityLabel(t.periodicity)}`);
             if (!haystack.includes(normalizeText(lancSearchTerm))) return false;
         }
 
@@ -847,22 +1022,27 @@ function renderLancamentos() {
     const sorted = [...transactions].sort((a,b) => parseLocalDate(b.date) - parseLocalDate(a.date));
     list.innerHTML = sorted.map(t => {
         const isExp = t.type === 'EXPENSE';
+        const isPending = !isTransactionCompleted(t);
         const d = parseLocalDate(t.date); d.setHours(0,0,0,0);
-        const isOverdue = isExp && d < today;
-        const isFuture = isExp && d > today;
+        const isOverdue = isExp && isPending && d < today;
+        const isFuture = isExp && isPending && d >= today;
         let badge = '';
         if (isOverdue) badge = '<span class="lanc-item-badge" style="background:#ffe0e0;color:var(--red);">Atrasada</span>';
         else if (isFuture) badge = '<span class="lanc-item-badge" style="background:#e8f4fd;color:#0369a1;">A vencer</span>';
+        else if (isPending) badge = '<span class="lanc-item-badge">A receber</span>';
+        else badge = `<span class="lanc-item-badge" style="background:#e8f8e7;color:var(--green);">${isExp ? 'Pago' : 'Recebido'}</span>`;
+        const periodicityLabel = getPeriodicityLabel(t.periodicity);
         return `<div class="lanc-item ${isExp ? 'expense' : 'income'} ${isOverdue ? 'overdue' : ''}">
             <div class="lanc-item-icon ${isExp ? 'expense-icon' : 'income-icon'}">${t.categoryIcon || (isExp ? '💸' : '💰')}</div>
             <div class="lanc-item-info">
-                <div class="lanc-item-name">${t.description} ${badge}</div>
-                <div class="lanc-item-sub">${t.categoryName || ''} · ${formatDate(t.date)}</div>
+                <div class="lanc-item-name">${escapeHtml(t.description)} ${badge}</div>
+                <div class="lanc-item-sub">${escapeHtml(t.categoryName || '')} - ${formatDate(t.date)} - ${escapeHtml(periodicityLabel)} - ${escapeHtml(t.originDescription || 'Origem nao informada')}</div>
             </div>
             <div class="lanc-item-amount ${isExp ? 'expense' : 'income'}">
                 ${isExp ? '-' : '+'}R$ ${Math.abs(t.amount).toFixed(2).replace('.',',')}
             </div>
             <div class="lanc-actions">
+                ${isPending ? `<button onclick="settleTransaction(${t.id})" title="Efetivar">${isExp ? 'Pagar' : 'Receber'}</button>` : ''}
                 <button onclick="openEditTransaction(${t.id})" title="Editar">Editar</button>
                 <button onclick="deleteTransaction(${t.id})" title="Excluir">Excluir</button>
             </div>
@@ -873,14 +1053,25 @@ function renderLancamentos() {
 }
 
 function updateLancFooter(transactions) {
-    const income = transactions.filter(t => t.type === 'INCOME').reduce((a,t) => a+t.amount, 0);
-    const expense = transactions.filter(t => t.type === 'EXPENSE').reduce((a,t) => a+t.amount, 0);
+    const completed = transactions.filter(isTransactionCompleted);
+    const pending = transactions.filter(transaction => !isTransactionCompleted(transaction));
+    const income = completed.filter(t => t.type === 'INCOME').reduce((a,t) => a + Number(t.amount), 0);
+    const expense = completed.filter(t => t.type === 'EXPENSE').reduce((a,t) => a + Number(t.amount), 0);
+    const pendingIncome = pending.filter(t => t.type === 'INCOME').reduce((a,t) => a + Number(t.amount), 0);
+    const pendingExpense = pending.filter(t => t.type === 'EXPENSE').reduce((a,t) => a + Number(t.amount), 0);
     const saldo = income - expense;
+    const forecast = saldo + pendingIncome - pendingExpense;
     setElText('f-saldo', saldo.toFixed(2).replace('.',','));
-    setElText('f-previsto', saldo.toFixed(2).replace('.',','));
-    document.querySelectorAll('#lanc-summary-expanded .val-green').forEach(el => el.textContent = income.toFixed(2).replace('.',','));
-    document.querySelectorAll('#lanc-summary-expanded .val-red').forEach(el => el.textContent = expense.toFixed(2).replace('.',','));
-    document.querySelectorAll('#lanc-summary-expanded .val-purple').forEach(el => el.textContent = saldo.toFixed(2).replace('.',','));
+    setElText('f-previsto', forecast.toFixed(2).replace('.',','));
+    const expandedRows = document.querySelectorAll('#lanc-summary-expanded .lanc-footer-row span:last-child');
+    if (expandedRows.length >= 7) {
+        expandedRows[1].textContent = income.toFixed(2).replace('.', ',');
+        expandedRows[2].textContent = pendingIncome.toFixed(2).replace('.', ',');
+        expandedRows[3].textContent = expense.toFixed(2).replace('.', ',');
+        expandedRows[4].textContent = pendingExpense.toFixed(2).replace('.', ',');
+        expandedRows[5].textContent = saldo.toFixed(2).replace('.', ',');
+        expandedRows[6].textContent = forecast.toFixed(2).replace('.', ',');
+    }
 }
 
 function toggleLancSummary() {
@@ -957,6 +1148,7 @@ async function loadRelatorios() {
 function getReportMonthTransactions() {
     const month = monthState.rel;
     return filterReportTransactions(allTransactions.filter(transaction => {
+        if (!isTransactionCompleted(transaction)) return false;
         const date = parseLocalDate(transaction.date);
         return date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
     }));
@@ -969,7 +1161,9 @@ function filterReportTransactions(transactions) {
         const typeMatch = reportFilters.types.has(transaction.type);
         const categoryMatch = !reportFilters.categoryIds.size ||
             reportFilters.categoryIds.has(Number(transaction.categoryId));
-        return availableCategory && typeMatch && categoryMatch;
+        const originMatch = !reportFilters.originKeys.size ||
+            reportFilters.originKeys.has(getOriginKey(transaction));
+        return availableCategory && typeMatch && categoryMatch && originMatch;
     });
 }
 
@@ -1140,6 +1334,16 @@ function populateReportFilterOptions() {
             <span>${escapeHtml(`${category.icon || ''} ${category.name}`.trim())}</span>
         </label>`).join('');
     container.innerHTML = options || '<p class="modal-empty">Nenhuma categoria disponível</p>';
+
+    const originsContainer = document.getElementById('rel-filter-origins');
+    if (!originsContainer) return;
+    const origins = getAvailableOrigins();
+    const allOriginsSelected = reportFilters.originKeys.size === 0;
+    originsContainer.innerHTML = origins.length ? origins.map(origin => `
+        <label class="modal-check">
+            <input type="checkbox" value="${origin.value}" ${allOriginsSelected || reportFilters.originKeys.has(origin.value) ? 'checked' : ''}>
+            <span>${escapeHtml(origin.label)}</span>
+        </label>`).join('') : '<p class="modal-empty">Nenhuma origem cadastrada</p>';
 }
 
 function openReportFiltersModal() {
@@ -1178,6 +1382,13 @@ function applyReportFilters() {
     reportFilters.categoryIds = selectedCategories.length === categories.length
         ? new Set()
         : new Set(selectedCategories);
+    const availableOrigins = getAvailableOrigins();
+    const selectedOrigins = Array.from(
+        document.querySelectorAll('#rel-filter-origins input:checked')
+    ).map(input => input.value);
+    reportFilters.originKeys = !availableOrigins.length || selectedOrigins.length === availableOrigins.length
+        ? new Set()
+        : new Set(selectedOrigins);
     closeReportFiltersModal();
     loadRelatorios();
 }
@@ -1185,6 +1396,7 @@ function applyReportFilters() {
 function clearReportFilters() {
     reportFilters.types = new Set(['INCOME', 'EXPENSE']);
     reportFilters.categoryIds = new Set();
+    reportFilters.originKeys = new Set();
     populateReportFilterOptions();
     document.getElementById('rel-filter-income').checked = true;
     document.getElementById('rel-filter-expense').checked = true;
@@ -1195,6 +1407,7 @@ function renderReportFilterBadge() {
     const badge = document.getElementById('rel-filter-count');
     if (!badge) return;
     let count = reportFilters.categoryIds.size;
+    count += reportFilters.originKeys.size;
     if (reportFilters.types.size < 2) count += reportFilters.types.size;
     badge.textContent = count ? String(count) : '';
     badge.style.display = count ? 'inline-flex' : 'none';
@@ -1210,15 +1423,15 @@ function switchPeriod(period, button) {
 
 function getFlowTransactions() {
     const selectedMonth = monthState.rel;
-    let scoped = allTransactions;
+    let scoped = allTransactions.filter(isTransactionCompleted);
     if (currentPeriod === 'diario' || currentPeriod === 'semanal') {
-        scoped = allTransactions.filter(transaction => {
+        scoped = allTransactions.filter(isTransactionCompleted).filter(transaction => {
             const date = parseLocalDate(transaction.date);
             return date.getMonth() === selectedMonth.getMonth() &&
                 date.getFullYear() === selectedMonth.getFullYear();
         });
     } else if (currentPeriod === 'mensal') {
-        scoped = allTransactions.filter(transaction =>
+        scoped = allTransactions.filter(isTransactionCompleted).filter(transaction =>
             parseLocalDate(transaction.date).getFullYear() === selectedMonth.getFullYear()
         );
     }
@@ -1681,6 +1894,40 @@ document.addEventListener('click', e => {
 });
 
 // ===== UTILS =====
+function isTransactionCompleted(transaction) {
+    if (transaction.status) return transaction.status === 'COMPLETED';
+    const date = parseLocalDate(transaction.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+    return date < today;
+}
+
+function getPeriodicityLabel(periodicity) {
+    const labels = { SINGLE: 'Unico', MONTHLY: 'Mensal', ANNUAL: 'Anual' };
+    return labels[periodicity] || labels.SINGLE;
+}
+
+function getOriginKey(transaction) {
+    if (transaction.accountId) return `ACCOUNT:${transaction.accountId}`;
+    if (transaction.creditCardId) return `CREDIT_CARD:${transaction.creditCardId}`;
+    return 'UNSPECIFIED';
+}
+
+function getAvailableOrigins() {
+    const accountOrigins = accounts
+        .filter(account => account.type === 'CHECKING' || account.type === 'SAVINGS')
+        .map(account => ({
+            value: `ACCOUNT:${account.id}`,
+            label: `${formatAccountType(account.type)} - ${account.name}`
+        }));
+    const cardOrigins = creditCards.map(card => ({
+        value: `CREDIT_CARD:${card.id}`,
+        label: `Cartao de credito - ${card.name} final ${card.lastFour}`
+    }));
+    return [...accountOrigins, ...cardOrigins];
+}
+
 function formatCurrency(v) {
     if (!v) v = 0;
     return `R$ ${parseFloat(v).toFixed(2).replace('.',',')}`;

@@ -2,9 +2,11 @@ package com.monify;
 
 import com.monify.dto.TransactionDTO;
 import com.monify.entity.Category;
+import com.monify.entity.Account;
 import com.monify.entity.Transaction;
 import com.monify.entity.User;
 import com.monify.repository.CategoryRepository;
+import com.monify.repository.AccountRepository;
 import com.monify.repository.TransactionRepository;
 import com.monify.repository.UserRepository;
 import com.monify.service.CategoryService;
@@ -49,12 +51,17 @@ class CategoryControllerTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
     private User user;
     private Category category;
+    private Account account;
 
     @BeforeEach
     void setUp() {
         transactionRepository.deleteAll();
+        accountRepository.deleteAll();
         userRepository.deleteAll();
         categoryRepository.deleteAll();
 
@@ -68,6 +75,12 @@ class CategoryControllerTest {
                 .icon("C")
                 .color("#123456")
                 .build());
+        account = accountRepository.save(Account.builder()
+                .name("Conta principal")
+                .type(Account.AccountType.CHECKING)
+                .balance(BigDecimal.ZERO)
+                .user(user)
+                .build());
     }
 
     @Test
@@ -78,6 +91,10 @@ class CategoryControllerTest {
                 .description("Teste de categoria")
                 .date(LocalDate.of(2026, 6, 22))
                 .categoryId(category.getId())
+                .periodicity(Transaction.TransactionPeriodicity.SINGLE)
+                .status(Transaction.TransactionStatus.COMPLETED)
+                .originType(Transaction.MovementOrigin.ACCOUNT)
+                .accountId(account.getId())
                 .build());
 
         mockMvc.perform(get("/api/categories"))

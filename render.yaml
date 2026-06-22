@@ -3,7 +3,7 @@ services:
     name: monify-app
     runtime: docker
     plan: free
-    healthCheckPath: /api/
+    healthCheckPath: /
     autoDeployTrigger: commit
     envVars:
       - key: SPRING_PROFILES_ACTIVE

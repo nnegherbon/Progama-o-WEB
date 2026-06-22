@@ -200,7 +200,7 @@ O arquivo `render.yaml` já define:
 
 - serviço web chamado `monify-app`;
 - runtime Docker;
-- health check em `/api/`;
+- health check em `/`;
 - redeploy automático a cada commit na branch conectada.
 
 O Dockerfile compila o projeto com Maven e executa o jar gerado:
@@ -234,7 +234,7 @@ JPA_DDL_AUTO=update
 Depois acesse:
 
 ```text
-http://localhost:8080/api/
+http://localhost:8080/
 ```
 
 ### Gerar pacote para produção

@@ -12,7 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/users/{userId}/limits")
+@RequestMapping("/api/users/{userId}/limits")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class SpendingLimitController {

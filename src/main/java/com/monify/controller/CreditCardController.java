@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/users/{userId}/cards")
+@RequestMapping("/api/users/{userId}/cards")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class CreditCardController {

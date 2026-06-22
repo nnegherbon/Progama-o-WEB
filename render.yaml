@@ -2,6 +2,7 @@ services:
   - type: web
     name: monify-app
     runtime: docker
+    plan: free
     healthCheckPath: /api/
     autoDeployTrigger: commit
     envVars:

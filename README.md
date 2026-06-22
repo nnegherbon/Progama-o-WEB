@@ -136,9 +136,11 @@ Explore o protótipo interativo da interface do usuário no Figma:
 Para este projeto, a opção mais simples é:
 
 - **Banco online:** Neon PostgreSQL
-- **Deploy da aplicação:** Render Web Service usando Docker
+- **Deploy da aplicação:** Render Web Service no plano Free usando Docker
 
 Essa combinação foi escolhida porque o Monify já é uma aplicação Spring Boot empacotada como `.jar`, com frontend estático dentro de `src/main/resources/static`. Assim, um único serviço Render consegue publicar backend e frontend juntos, enquanto o Neon fornece um PostgreSQL online compatível com Spring Data JPA.
+
+O plano Free do Render é suficiente para demonstrações e projetos acadêmicos. O serviço entra em repouso após um período sem acessos e pode demorar cerca de um minuto para responder à primeira requisição seguinte. O `render.yaml` fixa explicitamente `plan: free` para evitar a criação acidental de uma instância paga.
 
 O projeto foi preparado para não manter URL, usuário ou senha do banco no código. Em produção, essas informações devem ser configuradas somente por variáveis de ambiente.
 

@@ -1,6 +1,8 @@
 const API_BASE_URL = `${window.location.origin}/api`;
 let currentUser = null;
 let allTransactions = [];
+let pendingPayables = [];
+let pendingReceivables = [];
 let categories = [];
 let accounts = [];
 let creditCards = [];
@@ -114,6 +116,7 @@ async function handleRegister(e) {
 
 function logout() {
     currentUser = null; allTransactions = [];
+    pendingPayables = []; pendingReceivables = [];
     accounts = []; creditCards = []; limits = [];
     localStorage.removeItem('user');
     document.getElementById('app-page').style.display = 'none';
@@ -151,6 +154,7 @@ async function fetchAppData() {
     await Promise.all([
         loadCategories(),
         fetchAllTransactions(),
+        fetchPendingTransactions(),
         fetchAccounts(),
         fetchCreditCards(),
         fetchLimitsForMonth(getMonthKey(new Date()))
@@ -164,6 +168,29 @@ async function fetchAllTransactions() {
         allTransactions = await res.json();
         if (!Array.isArray(allTransactions)) allTransactions = [];
     } catch(e) { console.error(e); allTransactions = []; }
+}
+
+async function fetchPendingTransactions() {
+    if (!currentUser) return;
+    try {
+        const [payablesResponse, receivablesResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/transactions/user/${currentUser.id}/pending?type=EXPENSE`),
+            fetch(`${API_BASE_URL}/transactions/user/${currentUser.id}/pending?type=INCOME`)
+        ]);
+        if (!payablesResponse.ok || !receivablesResponse.ok) {
+            throw new Error('Nao foi possivel carregar os lancamentos pendentes');
+        }
+        const [payables, receivables] = await Promise.all([
+            payablesResponse.json(),
+            receivablesResponse.json()
+        ]);
+        pendingPayables = Array.isArray(payables) ? payables : [];
+        pendingReceivables = Array.isArray(receivables) ? receivables : [];
+    } catch (error) {
+        console.error(error);
+        pendingPayables = [];
+        pendingReceivables = [];
+    }
 }
 
 async function loadCategories() {
@@ -244,6 +271,7 @@ async function loadDashboard() {
     if (!currentUser) return;
     await Promise.all([
         fetchAllTransactions(),
+        fetchPendingTransactions(),
         fetchAccounts(),
         fetchCreditCards(),
         fetchLimitsForMonth(getMonthKey(new Date()))
@@ -597,8 +625,8 @@ function renderPendingPayables() {
     if (!body) return;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const pending = allTransactions
-        .filter(transaction => transaction.type === 'EXPENSE' && !isTransactionCompleted(transaction))
+    const pending = pendingPayables
+        .filter(transaction => transaction.status === 'PENDING')
         .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
 
     if (!pending.length) {
@@ -620,8 +648,8 @@ function renderPendingPayables() {
 function renderPendingReceivables() {
     const body = document.getElementById('receber-body');
     if (!body) return;
-    const pending = allTransactions
-        .filter(transaction => transaction.type === 'INCOME' && !isTransactionCompleted(transaction))
+    const pending = pendingReceivables
+        .filter(transaction => transaction.status === 'PENDING')
         .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date))
         .slice(0, 4);
 
@@ -669,7 +697,7 @@ async function settleTransaction(id) {
             { method: 'PATCH' }
         );
         if (!response.ok) throw await response.json();
-        await Promise.all([fetchAllTransactions(), fetchAccounts(), fetchCreditCards()]);
+        await Promise.all([fetchAllTransactions(), fetchPendingTransactions(), fetchAccounts(), fetchCreditCards()]);
         await loadDashboard();
         renderLancamentos();
         loadRelatorios();
@@ -766,12 +794,15 @@ function openQuickAdd(type, pending = false) {
     if (typeEl) typeEl.value = type;
     document.getElementById('q-periodicity').value = 'SINGLE';
     document.getElementById('q-status').value = pending ? 'PENDING' : 'COMPLETED';
+    document.getElementById('q-card-payment-mode').value = 'ONE_TIME';
+    document.getElementById('q-installment-count').value = '2';
     const titleEl = document.getElementById('modal-title');
     if (titleEl) titleEl.textContent = type === 'EXPENSE' ? 'Nova Despesa' : 'Nova Receita';
     const dateEl = document.getElementById('q-date');
     if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
     populateModalCategories();
     populateMovementOrigins();
+    syncInstallmentControls();
     if (!categories.length) {
         alert('Nenhuma categoria disponível. Atualize a página e tente novamente.');
         return;
@@ -809,6 +840,11 @@ function openEditTransaction(id) {
         ? `ACCOUNT:${transaction.accountId}`
         : transaction.creditCardId ? `CREDIT_CARD:${transaction.creditCardId}` : '';
     populateMovementOrigins(originValue);
+    document.getElementById('q-card-payment-mode').value = Number(transaction.installmentCount || 1) > 1
+        ? 'INSTALLMENT'
+        : 'ONE_TIME';
+    document.getElementById('q-installment-count').value = Number(transaction.installmentCount || 2);
+    syncInstallmentControls(transaction.installmentTotalAmount);
     document.getElementById('modal-title').textContent = 'Editar Lançamento';
     const form = document.getElementById('quick-modal').querySelector('form');
     if (form) form.dataset.mode = 'edit';
@@ -876,6 +912,36 @@ function populateMovementOrigins(selectedValue = '') {
             : 'Crie uma conta corrente, poupanca ou cartao no Dashboard.';
     }
     syncTransactionSubmitAvailability();
+    syncInstallmentControls();
+}
+
+function syncInstallmentControls(totalOverride = null) {
+    const type = document.getElementById('q-type')?.value;
+    const origin = document.getElementById('q-origin')?.value || '';
+    const paymentMode = document.getElementById('q-card-payment-mode');
+    const paymentGroup = document.getElementById('q-card-payment-group');
+    const installmentGroup = document.getElementById('q-installment-group');
+    const installmentInput = document.getElementById('q-installment-count');
+    const periodicity = document.getElementById('q-periodicity');
+    const isCardExpense = type === 'EXPENSE' && origin.startsWith('CREDIT_CARD:');
+    const isInstallment = isCardExpense && paymentMode?.value === 'INSTALLMENT';
+
+    if (paymentGroup) paymentGroup.hidden = !isCardExpense;
+    if (installmentGroup) installmentGroup.hidden = !isInstallment;
+    if (installmentInput) installmentInput.required = isInstallment;
+    if (periodicity) {
+        if (isInstallment) periodicity.value = 'SINGLE';
+        periodicity.disabled = isInstallment;
+    }
+
+    const count = Number(installmentInput?.value || 0);
+    const amount = Number((totalOverride ?? document.getElementById('q-amount')?.value) || 0);
+    const preview = document.getElementById('q-installment-preview');
+    if (preview) {
+        preview.textContent = isInstallment && count > 1 && amount > 0
+            ? `${count} parcelas de aproximadamente ${formatCurrency(amount / count)}`
+            : 'Informe o valor total e uma quantidade maior que 1.';
+    }
 }
 
 function syncTransactionSubmitAvailability() {
@@ -904,7 +970,16 @@ document.addEventListener('change', e => {
         populateModalCategories();
         populateMovementOrigins();
     }
+    if (e.target && ['q-origin', 'q-card-payment-mode', 'q-installment-count'].includes(e.target.id)) {
+        syncInstallmentControls();
+    }
     if (e.target && e.target.closest('.lanc-filters')) renderLancamentos();
+});
+
+document.addEventListener('input', e => {
+    if (e.target && ['q-amount', 'q-installment-count'].includes(e.target.id)) {
+        syncInstallmentControls();
+    }
 });
 
 document.addEventListener('click', e => {
@@ -923,6 +998,11 @@ async function handleQuickAdd(e) {
     const periodicity = document.getElementById('q-periodicity').value;
     const status = document.getElementById('q-status').value;
     const originValue = document.getElementById('q-origin').value;
+    const paymentMode = document.getElementById('q-card-payment-mode').value;
+    const isCardExpense = type === 'EXPENSE' && originValue.startsWith('CREDIT_CARD:');
+    const installmentCount = isCardExpense && paymentMode === 'INSTALLMENT'
+        ? Number(document.getElementById('q-installment-count').value)
+        : 1;
     const categoryId = parseInt(document.getElementById('q-category').value, 10);
     if (!categories.some(category => Number(category.id) === categoryId)) {
         alert('Selecione uma categoria válida.');
@@ -930,6 +1010,10 @@ async function handleQuickAdd(e) {
     }
     if (!originValue || !Number.isFinite(amount) || amount <= 0) {
         alert('Informe um valor valido e selecione a origem da movimentacao.');
+        return;
+    }
+    if (paymentMode === 'INSTALLMENT' && (!isCardExpense || !Number.isInteger(installmentCount) || installmentCount <= 1)) {
+        alert('Compras parceladas exigem cartao de credito e quantidade de parcelas maior que 1.');
         return;
     }
     const [originType, originIdValue] = originValue.split(':');
@@ -952,6 +1036,7 @@ async function handleQuickAdd(e) {
                 date,
                 periodicity,
                 status,
+                installmentCount,
                 ...originPayload
             })
         });

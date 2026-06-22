@@ -109,6 +109,19 @@ public class TransactionController {
         }
     }
 
+    @GetMapping("/user/{userId}/pending")
+    public ResponseEntity<?> getPendingTransactions(
+            @PathVariable Long userId,
+            @RequestParam Transaction.TransactionType type) {
+        try {
+            return ResponseEntity.ok(transactionService.getPendingTransactionsByUserIdAndType(userId, type));
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
     @PatchMapping("/{id}/settle")
     public ResponseEntity<?> settleTransaction(@PathVariable Long id, @RequestParam Long userId) {
         try {

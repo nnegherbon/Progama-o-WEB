@@ -13,8 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +38,17 @@ public class TransactionService {
         User user = userService.getUserById(userId);
         Category category = categoryService.getCategoryById(dto.getCategoryId());
 
+        validateInstallmentRequest(dto);
+        if (getInstallmentCount(dto) > 1) {
+            return createInstallmentTransactions(userId, user, category, dto);
+        }
+
         Transaction transaction = Transaction.builder()
                 .user(user)
                 .category(category)
+                .installmentNumber(1)
+                .installmentCount(1)
+                .installmentTotalAmount(dto.getAmount())
                 .build();
         applyDTO(transaction, dto, userId, null);
 
@@ -64,6 +74,13 @@ public class TransactionService {
             Long userId, Transaction.TransactionType type) {
         userService.getUserById(userId);
         return toDTOList(transactionRepository.findByUserIdAndType(userId, type));
+    }
+
+    public List<TransactionDTO> getPendingTransactionsByUserIdAndType(
+            Long userId, Transaction.TransactionType type) {
+        userService.getUserById(userId);
+        return toDTOList(transactionRepository.findByUserIdAndTypeAndStatusOrderByDateAsc(
+                userId, type, Transaction.TransactionStatus.PENDING));
     }
 
     public List<TransactionDTO> getTransactionsByUserIdAndCategory(Long userId, Long categoryId) {
@@ -162,6 +179,9 @@ public class TransactionService {
         transactionRepository.initializeLegacyPendingStatuses();
         transactionRepository.initializeLegacyCompletedStatuses();
         transactionRepository.initializeLegacyPeriodicities();
+        transactionRepository.initializeLegacyInstallmentNumbers();
+        transactionRepository.initializeLegacyInstallmentCounts();
+        transactionRepository.initializeLegacyInstallmentTotals();
     }
 
     public TransactionDTO convertToDTO(Transaction transaction) {
@@ -186,6 +206,12 @@ public class TransactionService {
                 .originType(originType)
                 .accountId(account != null ? account.getId() : null)
                 .creditCardId(card != null ? card.getId() : null)
+                .installmentGroupKey(transaction.getInstallmentGroupKey())
+                .installmentNumber(defaultInstallmentNumber(transaction))
+                .installmentCount(defaultInstallmentCount(transaction))
+                .installmentTotalAmount(transaction.getInstallmentTotalAmount() != null
+                        ? transaction.getInstallmentTotalAmount()
+                        : transaction.getAmount())
                 .originName(account != null ? account.getName() : card != null ? card.getName() : "Nao informado")
                 .originDescription(originDescription(account, card))
                 .categoryId(transaction.getCategory().getId())
@@ -273,6 +299,101 @@ public class TransactionService {
         throw new RuntimeException("Origem da movimentacao e obrigatoria");
     }
 
+    private Transaction createInstallmentTransactions(
+            Long userId,
+            User user,
+            Category category,
+            TransactionDTO dto) {
+        int count = getInstallmentCount(dto);
+        BigDecimal total = dto.getAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal regularAmount = total.divide(BigDecimal.valueOf(count), 2, RoundingMode.DOWN);
+        BigDecimal allocated = BigDecimal.ZERO;
+        String groupKey = UUID.randomUUID().toString();
+        List<Transaction> savedInstallments = new ArrayList<>();
+
+        for (int index = 1; index <= count; index++) {
+            BigDecimal installmentAmount = index == count
+                    ? total.subtract(allocated)
+                    : regularAmount;
+            allocated = allocated.add(installmentAmount);
+
+            TransactionDTO installmentDTO = copyForInstallment(
+                    dto,
+                    installmentAmount,
+                    dto.getDate().plusMonths(index - 1L),
+                    index,
+                    count);
+            Transaction installment = Transaction.builder()
+                    .user(user)
+                    .category(category)
+                    .installmentGroupKey(groupKey)
+                    .installmentNumber(index)
+                    .installmentCount(count)
+                    .installmentTotalAmount(total)
+                    .build();
+            applyDTO(installment, installmentDTO, userId, null);
+
+            Transaction saved = transactionRepository.save(installment);
+            if (isCompleted(saved)) {
+                applyFinancialImpact(saved, BigDecimal.ONE);
+            }
+            savedInstallments.add(saved);
+        }
+
+        return savedInstallments.get(0);
+    }
+
+    private TransactionDTO copyForInstallment(
+            TransactionDTO source,
+            BigDecimal amount,
+            LocalDate date,
+            int number,
+            int count) {
+        return TransactionDTO.builder()
+                .amount(amount)
+                .type(source.getType())
+                .description(source.getDescription().trim() + " - Parcela " + number + "/" + count)
+                .date(date)
+                .periodicity(Transaction.TransactionPeriodicity.SINGLE)
+                .status(source.getStatus())
+                .originType(source.getOriginType())
+                .accountId(source.getAccountId())
+                .creditCardId(source.getCreditCardId())
+                .categoryId(source.getCategoryId())
+                .installmentNumber(number)
+                .installmentCount(count)
+                .installmentTotalAmount(source.getAmount())
+                .build();
+    }
+
+    private void validateInstallmentRequest(TransactionDTO dto) {
+        int count = getInstallmentCount(dto);
+        if (count < 1) {
+            throw new RuntimeException("Quantidade de parcelas deve ser pelo menos 1");
+        }
+        if (count == 1) {
+            return;
+        }
+        if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Valor total deve ser maior que zero");
+        }
+        if (dto.getType() != Transaction.TransactionType.EXPENSE) {
+            throw new RuntimeException("Parcelamento e permitido apenas para despesas");
+        }
+        if (dto.getOriginType() != Transaction.MovementOrigin.CREDIT_CARD
+                || dto.getCreditCardId() == null
+                || dto.getAccountId() != null) {
+            throw new RuntimeException("Parcelamento e permitido apenas no cartao de credito");
+        }
+        if (defaultPeriodicity(dto.getPeriodicity()) != Transaction.TransactionPeriodicity.SINGLE) {
+            throw new RuntimeException("Compra parcelada nao pode ter recorrencia mensal ou anual");
+        }
+    }
+
+    private int getInstallmentCount(TransactionDTO dto) {
+        return dto.getInstallmentCount() != null ? dto.getInstallmentCount() : 1;
+    }
+
     private void applyFinancialImpact(Transaction transaction, BigDecimal multiplier) {
         BigDecimal amount = transaction.getAmount().multiply(multiplier);
         Long userId = transaction.getUser().getId();
@@ -329,6 +450,9 @@ public class TransactionService {
                 .periodicity(periodicity)
                 .status(Transaction.TransactionStatus.PENDING)
                 .recurrenceKey(recurrenceKey)
+                .installmentNumber(1)
+                .installmentCount(1)
+                .installmentTotalAmount(transaction.getAmount())
                 .build();
         transactionRepository.save(next);
     }
@@ -381,5 +505,13 @@ public class TransactionService {
 
     private BigDecimal defaultZero(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private int defaultInstallmentNumber(Transaction transaction) {
+        return transaction.getInstallmentNumber() != null ? transaction.getInstallmentNumber() : 1;
+    }
+
+    private int defaultInstallmentCount(Transaction transaction) {
+        return transaction.getInstallmentCount() != null ? transaction.getInstallmentCount() : 1;
     }
 }

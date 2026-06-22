@@ -50,6 +50,18 @@ public class Transaction {
     @Column(name = "recurrence_key", length = 36)
     private String recurrenceKey;
 
+    @Column(name = "installment_group_key", length = 36)
+    private String installmentGroupKey;
+
+    @Column(name = "installment_number")
+    private Integer installmentNumber;
+
+    @Column(name = "installment_count")
+    private Integer installmentCount;
+
+    @Column(name = "installment_total_amount", precision = 12, scale = 2)
+    private BigDecimal installmentTotalAmount;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -81,6 +93,15 @@ public class Transaction {
         }
         if (this.status == null) {
             this.status = TransactionStatus.PENDING;
+        }
+        if (this.installmentNumber == null) {
+            this.installmentNumber = 1;
+        }
+        if (this.installmentCount == null) {
+            this.installmentCount = 1;
+        }
+        if (this.installmentTotalAmount == null) {
+            this.installmentTotalAmount = this.amount;
         }
     }
 

@@ -431,6 +431,18 @@
                 <select id="q-origin" required></select>
                 <small class="form-help" id="q-origin-help"></small>
             </div>
+            <div class="form-group" id="q-card-payment-group" hidden>
+                <label>Forma da compra no cartao</label>
+                <select id="q-card-payment-mode">
+                    <option value="ONE_TIME">A vista</option>
+                    <option value="INSTALLMENT">Parcelada</option>
+                </select>
+            </div>
+            <div class="form-group" id="q-installment-group" hidden>
+                <label>Quantidade de parcelas</label>
+                <input type="number" id="q-installment-count" min="2" max="60" step="1" value="2">
+                <small class="form-help" id="q-installment-preview"></small>
+            </div>
             <div class="form-group">
                 <label>Valor</label>
                 <input type="number" id="q-amount" step="0.01" min="0" placeholder="0,00" required>
@@ -603,6 +615,6 @@
     </div>
 </div>
 
-<script src="app.js?v=20260622-2"></script>
+<script src="app.js?v=20260622-3"></script>
 </body>
 </html>

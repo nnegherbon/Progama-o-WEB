@@ -43,6 +43,14 @@ public class TransactionDTO {
 
     private Long creditCardId;
 
+    private String installmentGroupKey;
+
+    private Integer installmentNumber;
+
+    private Integer installmentCount;
+
+    private BigDecimal installmentTotalAmount;
+
     @NotNull(message = "Categoria é obrigatória")
     private Long categoryId;
 

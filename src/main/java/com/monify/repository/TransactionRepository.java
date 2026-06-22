@@ -23,6 +23,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByUserIdOrderByDateDesc(Long userId);
 
+    List<Transaction> findByUserIdAndTypeAndStatusOrderByDateAsc(
+            Long userId,
+            Transaction.TransactionType type,
+            Transaction.TransactionStatus status);
+
     boolean existsByRecurrenceKeyAndDate(String recurrenceKey, LocalDate date);
 
     boolean existsByAccountId(Long accountId);
@@ -59,4 +64,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Modifying
     @Query(value = "UPDATE transactions SET periodicity = 'SINGLE' WHERE periodicity IS NULL", nativeQuery = true)
     int initializeLegacyPeriodicities();
+
+    @Modifying
+    @Query(value = "UPDATE transactions SET installment_number = 1 WHERE installment_number IS NULL", nativeQuery = true)
+    int initializeLegacyInstallmentNumbers();
+
+    @Modifying
+    @Query(value = "UPDATE transactions SET installment_count = 1 WHERE installment_count IS NULL", nativeQuery = true)
+    int initializeLegacyInstallmentCounts();
+
+    @Modifying
+    @Query(value = "UPDATE transactions SET installment_total_amount = amount WHERE installment_total_amount IS NULL", nativeQuery = true)
+    int initializeLegacyInstallmentTotals();
 }

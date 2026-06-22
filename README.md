@@ -128,3 +128,152 @@ Explore o protótipo interativo da interface do usuário no Figma:
 **Vídeo do projeto funcionando (30%) ->**
 
 [Criando transações e login do sistema](https://drive.google.com/file/d/1OM2IwWkDGXL4QuKV_ATwPsWkqDUg95TQ/view?usp=sharing)
+
+## Deploy
+
+### Escolha de deploy
+
+Para este projeto, a opção mais simples é:
+
+- **Banco online:** Neon PostgreSQL
+- **Deploy da aplicação:** Render Web Service usando Docker
+
+Essa combinação foi escolhida porque o Monify já é uma aplicação Spring Boot empacotada como `.jar`, com frontend estático dentro de `src/main/resources/static`. Assim, um único serviço Render consegue publicar backend e frontend juntos, enquanto o Neon fornece um PostgreSQL online compatível com Spring Data JPA.
+
+O projeto foi preparado para não manter URL, usuário ou senha do banco no código. Em produção, essas informações devem ser configuradas somente por variáveis de ambiente.
+
+### Banco online no Neon
+
+1. Crie uma conta em https://neon.tech.
+2. Crie um novo projeto PostgreSQL.
+3. No painel do projeto, clique em **Connect**.
+4. Copie os dados de conexão.
+5. Monte a URL JDBC no formato:
+
+```text
+jdbc:postgresql://HOST:5432/NOME_DO_BANCO?sslmode=require
+```
+
+Exemplo:
+
+```text
+jdbc:postgresql://ep-exemplo-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require
+```
+
+Use essa URL na variável `DB_URL`. O usuário vai em `DB_USERNAME` e a senha vai em `DB_PASSWORD`.
+
+### Variáveis de ambiente
+
+Configure estas variáveis no serviço de deploy:
+
+```text
+DB_URL=jdbc:postgresql://HOST:5432/DATABASE?sslmode=require
+DB_USERNAME=usuario_do_banco
+DB_PASSWORD=senha_do_banco
+SPRING_PROFILES_ACTIVE=prod
+JPA_DDL_AUTO=update
+APP_LOG_LEVEL=INFO
+SQL_LOG_LEVEL=WARN
+```
+
+O Render também fornece a variável `PORT` automaticamente. A aplicação já está configurada com:
+
+```properties
+server.port=${PORT:8080}
+```
+
+Nunca coloque senhas reais no GitHub. Use o arquivo `.env.example` apenas como modelo.
+
+### Deploy no Render
+
+1. Crie uma conta em https://render.com.
+2. Conecte o Render ao repositório GitHub do projeto.
+3. Escolha a opção **New Blueprint** ou **New Web Service**.
+4. Se usar Blueprint, o Render lerá o arquivo `render.yaml`.
+5. Confirme que o serviço usa Docker.
+6. Configure as variáveis `DB_URL`, `DB_USERNAME` e `DB_PASSWORD`.
+7. Inicie o deploy.
+
+O arquivo `render.yaml` já define:
+
+- serviço web chamado `monify-app`;
+- runtime Docker;
+- health check em `/api/`;
+- redeploy automático a cada commit na branch conectada.
+
+O Dockerfile compila o projeto com Maven e executa o jar gerado:
+
+```bash
+java -jar /app/app.jar
+```
+
+### Rodar localmente
+
+Para rodar localmente com o perfil `local`, use:
+
+```bash
+mvn clean test
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+No Windows PowerShell, mantenha o argumento do profile entre aspas, como no exemplo acima.
+
+O perfil `local` usa H2 em memória por padrão para facilitar testes rápidos. Para testar localmente com PostgreSQL, defina as variáveis abaixo antes de iniciar:
+
+```bash
+DB_URL=jdbc:postgresql://localhost:5432/monify_db
+DB_USERNAME=postgres
+DB_PASSWORD=sua_senha
+DB_DRIVER=org.postgresql.Driver
+DB_DIALECT=org.hibernate.dialect.PostgreSQLDialect
+JPA_DDL_AUTO=update
+```
+
+Depois acesse:
+
+```text
+http://localhost:8080/api/
+```
+
+### Gerar pacote para produção
+
+Antes de enviar alterações para deploy, valide:
+
+```bash
+mvn clean test
+mvn clean package
+```
+
+O jar será gerado em:
+
+```text
+target/monify-app-1.0.0.jar
+```
+
+## Atualizar o projeto publicado
+
+Fluxo recomendado após uma correção:
+
+```bash
+mvn clean test
+mvn spring-boot:run
+```
+
+Depois faça commit e envie para o GitHub:
+
+```bash
+git add .
+git commit -m "fix: ajuste necessario para deploy"
+git push origin main
+```
+
+Se o serviço Render estiver conectado ao GitHub com deploy automático habilitado, o redeploy normalmente começará sozinho após o push na branch principal.
+
+Se o redeploy automático estiver desativado:
+
+1. Acesse o painel do Render.
+2. Abra o serviço `monify-app`.
+3. Clique em **Manual Deploy**.
+4. Escolha **Deploy latest commit**.
+
+Sempre confirme no painel do Render se as variáveis `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` e `SPRING_PROFILES_ACTIVE` continuam configuradas.

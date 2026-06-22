@@ -34,6 +34,9 @@ public class SpendingLimit {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "used_amount", precision = 12, scale = 2)
+    private BigDecimal usedAmount;
+
     @Column(name = "limit_type")
     @Enumerated(EnumType.STRING)
     private LimitType limitType;
@@ -54,6 +57,9 @@ public class SpendingLimit {
         this.updatedAt = LocalDateTime.now();
         if (this.limitType == null) {
             this.limitType = LimitType.EXPENSE;
+        }
+        if (this.usedAmount == null) {
+            this.usedAmount = BigDecimal.ZERO;
         }
     }
 

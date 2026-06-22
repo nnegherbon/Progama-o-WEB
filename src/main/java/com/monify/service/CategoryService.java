@@ -15,8 +15,15 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     public Category createCategory(String name, String icon, String color) {
+        if (name == null || name.isBlank()) {
+            throw new RuntimeException("Nome da categoria e obrigatorio");
+        }
+        String normalizedName = name.trim();
+        if (categoryRepository.findByName(normalizedName).isPresent()) {
+            throw new RuntimeException("Categoria ja cadastrada");
+        }
         Category category = Category.builder()
-                .name(name)
+                .name(normalizedName)
                 .icon(icon)
                 .color(color)
                 .build();
@@ -29,7 +36,7 @@ public class CategoryService {
     }
 
     public List<Category> getAllCategories() {
-        return categoryRepository.findAll();
+        return categoryRepository.findAllByOrderByNameAsc();
     }
 
     public Category getCategoryByName(String name) {

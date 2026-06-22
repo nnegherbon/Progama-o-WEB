@@ -1,6 +1,7 @@
 package com.monify.dto;
 
 import com.monify.entity.SpendingLimit;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -29,10 +30,15 @@ public class SpendingLimitDTO {
     private String month;
 
     @NotNull(message = "Valor limite e obrigatorio")
+    @DecimalMin(value = "0.01", message = "Valor limite deve ser maior que zero")
     private BigDecimal amount;
+
+    @DecimalMin(value = "0.00", message = "Valor utilizado nao pode ser negativo")
+    private BigDecimal usedAmount;
 
     private SpendingLimit.LimitType limitType;
 
     private BigDecimal spent;
+    private BigDecimal remaining;
     private BigDecimal percentage;
 }

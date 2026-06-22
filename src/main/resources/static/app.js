@@ -8,12 +8,18 @@ let limits = [];
 let gastosChartInstance = null;
 let relChartExpense = null;
 let relChartIncome = null;
-let relEntSaiChart = null;
-let relViewMode = 'list';
-let relFilterMode = 'all';
+let relCategoryEvolutionChart = null;
+let relFlowBarChart = null;
+let relFlowEvolutionChart = null;
+let relViewMode = 'categories';
 let editingTransactionId = null;
+let editingLimitId = null;
 let lancSearchTerm = '';
-let incomeLimits = [];
+let currentPeriod = 'diario';
+const reportFilters = {
+    types: new Set(['INCOME', 'EXPENSE']),
+    categoryIds: new Set()
+};
 
 const monthState = { lanc: new Date(), rel: new Date(), lim: new Date() };
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -29,8 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (qDate) qDate.value = today;
     const limMonth = document.getElementById('lim-month');
     if (limMonth) limMonth.value = today.slice(0,7);
-    const limIncomeMonth = document.getElementById('lim-income-month');
-    if (limIncomeMonth) limIncomeMonth.value = today.slice(0,7);
     document.addEventListener('keydown', handleGlobalKeydown);
 });
 
@@ -52,7 +56,7 @@ function changeMonth(dir, key) {
     renderMonthLabels();
     if (key === 'lim') {
         updateLimEmptyMsg();
-        renderActiveLimitTab();
+        renderLimites();
     }
     if (key === 'lanc') loadLancamentos();
     if (key === 'rel') loadRelatorios();
@@ -162,6 +166,8 @@ async function loadCategories() {
         const res = await fetch(`${API_BASE_URL}/categories`);
         const data = await res.json();
         categories = Array.isArray(data) ? data : [];
+        populateLancamentoCategoryFilters();
+        populateReportFilterOptions();
     } catch(e) { console.error(e); categories = []; }
 }
 
@@ -192,15 +198,6 @@ async function fetchLimitsForMonth(monthKey) {
     } catch(e) { console.error(e); limits = []; }
 }
 
-async function fetchIncomeLimitsForMonth(monthKey) {
-    if (!currentUser) return;
-    try {
-        const res = await fetch(`${API_BASE_URL}/users/${currentUser.id}/limits?month=${monthKey}&type=INCOME`);
-        const data = await res.json();
-        incomeLimits = Array.isArray(data) ? data : [];
-    } catch(e) { console.error(e); incomeLimits = []; }
-}
-
 // ===== NAVIGATION =====
 function showSection(section, event) {
     if (!currentUser) return;
@@ -212,7 +209,7 @@ function showSection(section, event) {
     if (section === 'dashboard') loadDashboard();
     if (section === 'lancamentos') loadLancamentos();
     if (section === 'relatorios') loadRelatorios();
-    if (section === 'limites') renderActiveLimitTab();
+    if (section === 'limites') renderLimites();
 }
 
 // ===== DASHBOARD =====
@@ -632,14 +629,15 @@ function renderLimitesCard() {
         return;
     }
     body.innerHTML = limits.map(l => {
-        const spent = Number(l.spent || 0);
+        const used = Number(l.usedAmount ?? l.spent ?? 0);
         const amount = Number(l.amount || 0);
         const pct = Math.min(Number(l.percentage || 0), 100);
         const fillClass = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : '';
+        const category = findCategoryByName(l.categoryName);
         return `<div class="lim-item">
             <div class="lim-item-header">
-                <div class="lim-item-name">${getCategoryEmoji(l.categoryKey)} ${escapeHtml(l.categoryName)}</div>
-                <div class="lim-item-vals">${formatCurrency(spent)} / ${formatCurrency(amount)}</div>
+                <div class="lim-item-name">${escapeHtml(category?.icon || '')} ${escapeHtml(l.categoryName)}</div>
+                <div class="lim-item-vals">${formatCurrency(used)} / ${formatCurrency(amount)}</div>
             </div>
             <div class="lim-progress-bar"><div class="lim-progress-fill ${fillClass}" style="width:${pct.toFixed(1)}%"></div></div>
         </div>`;
@@ -700,10 +698,22 @@ function populateModalCategories() {
     });
 }
 
+function populateLancamentoCategoryFilters() {
+    const menu = document.getElementById('cat-dd');
+    if (!menu) return;
+    const selected = new Set(
+        Array.from(menu.querySelectorAll('input:checked')).map(input => input.value)
+    );
+    menu.innerHTML = '<p class="dd-group-label">Categorias cadastradas</p>' +
+        categories.map(category => {
+            const value = `category:${category.id}`;
+            return `<label><input type="checkbox" value="${value}" ${selected.has(value) ? 'checked' : ''}> ${escapeHtml(`${category.icon || ''} ${category.name}`.trim())}</label>`;
+        }).join('');
+}
+
 document.addEventListener('change', e => {
     if (e.target && e.target.id === 'q-type') populateModalCategories();
     if (e.target && e.target.closest('.lanc-filters')) renderLancamentos();
-    if (e.target && e.target.id === 'considerar-nao-pagas') loadRelatorios();
 });
 
 document.addEventListener('click', e => {
@@ -747,6 +757,7 @@ function closeModalOutside(e) {
         closeAccountsModal();
         closeCardsModal();
         closeProfileModal();
+        closeReportFiltersModal();
     }
 }
 
@@ -764,17 +775,12 @@ function getFilteredTransactions() {
         const checked = Array.from(document.querySelectorAll('.lanc-filters input[type=checkbox]:checked')).map(cb => cb.value);
         if (!checked.length) return true;
 
-        const typeMatch = checked.some(value =>
-            (value.startsWith('receitas') && t.type === 'INCOME') ||
-            (value.startsWith('despesas') && t.type === 'EXPENSE')
-        );
-        const categoryKey = normalizeText(t.categoryName || '');
-        const categoryMatch = checked.some(value => categoryKey.includes(value.replace('-d', '').replace('-r', '')));
+        const selectedTypes = checked.filter(value => value.startsWith('type:')).map(value => value.slice(5));
+        const selectedCategories = checked.filter(value => value.startsWith('category:')).map(value => Number(value.slice(9)));
+        const typeMatch = !selectedTypes.length || selectedTypes.includes(t.type);
+        const categoryMatch = !selectedCategories.length || selectedCategories.includes(Number(t.categoryId));
 
-        const hasTypeFilter = checked.some(value => value.startsWith('receitas') || value.startsWith('despesas'));
-        const hasCategoryFilter = checked.some(value => !value.startsWith('receitas') && !value.startsWith('despesas') && value !== 'fixos' && value !== 'parcelados');
-
-        return (!hasTypeFilter || typeMatch) && (!hasCategoryFilter || categoryMatch);
+        return typeMatch && categoryMatch;
     });
 }
 
@@ -900,157 +906,449 @@ async function deleteTransaction(id) {
 // ===== RELATÓRIOS =====
 async function loadRelatorios() {
     await fetchAllTransactions();
-    const m = monthState.rel;
-    const transactions = allTransactions.filter(t => {
-        const d = parseLocalDate(t.date);
-        return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear();
-    });
-    renderRelatoriosCategorias(transactions);
-    renderRelatoriosEntSai(transactions, 'diario');
+    renderReportFilterBadge();
+    renderCategoryReport(getReportMonthTransactions());
+    renderFlowReport();
 }
 
-function renderRelatoriosCategorias(transactions) {
+function getReportMonthTransactions() {
+    const month = monthState.rel;
+    return filterReportTransactions(allTransactions.filter(transaction => {
+        const date = parseLocalDate(transaction.date);
+        return date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
+    }));
+}
+
+function filterReportTransactions(transactions) {
+    return transactions.filter(transaction => {
+        const typeMatch = reportFilters.types.has(transaction.type);
+        const categoryMatch = !reportFilters.categoryIds.size ||
+            reportFilters.categoryIds.has(Number(transaction.categoryId));
+        return typeMatch && categoryMatch;
+    });
+}
+
+function calculateReportTotals(transactions) {
+    const income = transactions
+        .filter(transaction => transaction.type === 'INCOME')
+        .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
+    const expense = transactions
+        .filter(transaction => transaction.type === 'EXPENSE')
+        .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
+    return { income, expense, result: income - expense, count: transactions.length };
+}
+
+function renderReportSummary(transactions) {
+    const totals = calculateReportTotals(transactions);
+    return `<div class="report-summary-grid">
+        <div class="report-summary-item"><span>Entradas</span><strong class="val-green">${formatCurrency(totals.income)}</strong></div>
+        <div class="report-summary-item"><span>Saídas</span><strong class="val-red">${formatCurrency(totals.expense)}</strong></div>
+        <div class="report-summary-item"><span>Resultado</span><strong class="val-purple">${formatCurrency(totals.result)}</strong></div>
+        <div class="report-summary-item"><span>Lançamentos</span><strong>${totals.count}</strong></div>
+    </div>`;
+}
+
+function groupTransactionsByCategory(transactions) {
+    const grouped = new Map();
+    transactions.forEach(transaction => {
+        const key = String(transaction.categoryId || transaction.categoryName || 'outros');
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                name: transaction.categoryName || 'Outros',
+                icon: transaction.categoryIcon || '',
+                color: transaction.categoryColor || '#6262D3',
+                total: 0
+            });
+        }
+        grouped.get(key).total += Number(transaction.amount || 0);
+    });
+    return Array.from(grouped.values()).sort((a, b) => b.total - a.total);
+}
+
+function renderCategoryReport(transactions) {
     const container = document.getElementById('rel-cat-content');
     if (!container) return;
+    destroyReportCategoryCharts();
 
-    if (!transactions.length) {
-        container.innerHTML = '<div class="page-empty-state"><div class="empty-icon-circle">!</div><p>Nenhum lançamento no período</p></div>';
+    if (relViewMode === 'evolution') {
+        renderCategoryEvolution(container, transactions);
         return;
     }
 
-    const expenses = transactions.filter(t => t.type === 'EXPENSE');
-    const incomes  = transactions.filter(t => t.type === 'INCOME');
-
-    const groupBy = arr => {
-        const map = {};
-        arr.forEach(t => {
-            const k = t.categoryName || 'Outros';
-            if (!map[k]) map[k] = { icon: t.categoryIcon || '📦', total:0 };
-            map[k].total += t.amount;
-        });
-        return Object.entries(map).map(([name, g]) => ({ name, ...g })).sort((a,b) => b.total - a.total);
-    };
-
-    const expGroups = groupBy(expenses);
-    const incGroups = groupBy(incomes);
-    const expTotal  = expGroups.reduce((a,g) => a+g.total, 0);
-    const incTotal  = incGroups.reduce((a,g) => a+g.total, 0);
-    const expColors = ['#EFB4B4','#494FDF','#f59e0b','#6262D3','#CF0404','#BEBEBE','#14A10C','#C1D8C0'];
-    const incColors = ['#C1D8C0','#14A10C','#6262D3','#494FDF','#f59e0b'];
-
-    const renderBlock = (groups, total, label, chartId, colors) => {
-        if (!groups.length) return '';
-        const items = groups.map(g => {
-            const pct = total > 0 ? ((g.total/total)*100).toFixed(1) : '0.0';
-            return `<div class="rel-item">
-                <div class="rel-item-icon">${g.icon}</div>
-                <div class="rel-item-name">${g.name}</div>
-                <div class="rel-item-vals">
-                    <span class="rel-item-amount">R$ ${g.total.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
-                    <span class="rel-item-pct">${pct}%</span>
-                </div>
-            </div>`;
-        }).join('');
-        return `<div class="rel-block rel-view-${relViewMode}">
-            <div class="rel-content">
-                <div class="rel-list">
-                    <p class="rel-section-label">${label}</p>
-                    ${items}
-                    <div class="rel-total"><span>Total</span><span>R$ ${total.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>
-                </div>
-                <div class="rel-chart">
-                    <canvas id="${chartId}" width="160" height="160"></canvas>
-                    <p class="rel-note">Gastos de cartão com base na data da compra</p>
-                </div>
-            </div>
-        </div>`;
-    };
-
-    container.innerHTML =
-        renderBlock(expGroups, expTotal, 'Despesas', 'rel-chart-exp', expColors) +
-        (relFilterMode === 'all' && expGroups.length && incGroups.length ? '<hr class="rel-divider">' : '') +
-        (relFilterMode === 'all' ? renderBlock(incGroups, incTotal, 'Receitas', 'rel-chart-inc', incColors) : '');
-
-    setTimeout(() => {
-        if (expGroups.length) {
-            const ctx = document.getElementById('rel-chart-exp');
-            if (ctx) { if(relChartExpense) relChartExpense.destroy(); relChartExpense = new Chart(ctx, { type:'doughnut', data:{ labels:expGroups.map(g=>g.name), datasets:[{ data:expGroups.map(g=>g.total), backgroundColor:expColors.slice(0,expGroups.length), borderWidth:0 }] }, options:{ cutout:'65%', plugins:{ legend:{display:false} } } }); }
-        }
-        if (incGroups.length) {
-            const ctx = document.getElementById('rel-chart-inc');
-            if (ctx) { if(relChartIncome) relChartIncome.destroy(); relChartIncome = new Chart(ctx, { type:'doughnut', data:{ labels:incGroups.map(g=>g.name), datasets:[{ data:incGroups.map(g=>g.total), backgroundColor:incColors.slice(0,incGroups.length), borderWidth:0 }] }, options:{ cutout:'65%', plugins:{ legend:{display:false} } } }); }
-        }
-    }, 50);
-}
-
-// ===== RELATÓRIOS ENTRADAS x SAÍDAS =====
-let currentPeriod = 'diario';
-
-function switchPeriod(period, btn) {
-    document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentPeriod = period;
-    const m = monthState.rel;
-    const transactions = allTransactions.filter(t => {
-        const d = parseLocalDate(t.date);
-        return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear();
-    });
-    renderRelatoriosEntSai(transactions, period);
-}
-
-function renderRelatoriosEntSai(transactions, period) {
-    const container = document.getElementById('rel-ent-sai-content');
-    if (!container) return;
+    const expenses = groupTransactionsByCategory(transactions.filter(transaction => transaction.type === 'EXPENSE'));
+    const incomes = groupTransactionsByCategory(transactions.filter(transaction => transaction.type === 'INCOME'));
 
     if (!transactions.length) {
-        container.innerHTML = '<div class="page-empty-state"><div class="empty-icon-circle">!</div><p>Nenhum lançamento no período</p></div>';
+        container.innerHTML = renderReportSummary([]) +
+            '<div class="page-empty-state"><div class="empty-icon-circle">!</div><p>Nenhum lançamento para os filtros selecionados</p></div>';
         return;
     }
 
-    // Group by period
-    const groups = {};
-    transactions.forEach(t => {
-        const d = parseLocalDate(t.date);
-        let key;
-        if (period === 'diario') {
-            key = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
-        } else if (period === 'semanal') {
-            const weekNum = Math.ceil(d.getDate() / 7);
-            key = `Sem. ${weekNum}`;
-        } else if (period === 'mensal') {
-            key = MONTHS[d.getMonth()];
-        } else { // acumulado
-            key = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-        }
-        if (!groups[key]) groups[key] = { income: 0, expense: 0 };
-        if (t.type === 'INCOME') groups[key].income += t.amount;
-        else groups[key].expense += t.amount;
+    const blocks = [
+        renderCategoryBlock('Despesas', expenses, 'rel-chart-exp'),
+        renderCategoryBlock('Receitas', incomes, 'rel-chart-inc')
+    ].filter(Boolean).join('');
+
+    container.innerHTML = renderReportSummary(transactions) +
+        `<div class="report-category-grid">${blocks}</div>`;
+
+    requestAnimationFrame(() => {
+        relChartExpense = createDoughnutChart('rel-chart-exp', expenses);
+        relChartIncome = createDoughnutChart('rel-chart-inc', incomes);
     });
+}
 
-    const entries = Object.entries(groups);
-    const maxVal = Math.max(...entries.map(([, g]) => Math.max(g.income, g.expense)), 1);
-
-    const bars = entries.map(([label, g]) => {
-        const incW = ((g.income / maxVal) * 100).toFixed(1);
-        const expW = ((g.expense / maxVal) * 100).toFixed(1);
-        return `<div class="ent-sai-row">
-            <div class="ent-sai-label">${label}</div>
-            <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
-                <div class="ent-sai-bar-wrap"><div class="ent-sai-bar income" style="width:${incW}%"></div></div>
-                <div class="ent-sai-bar-wrap"><div class="ent-sai-bar expense" style="width:${expW}%"></div></div>
-            </div>
-            <div style="text-align:right;font-size:0.78rem;min-width:90px;">
-                <div class="val-green">+R$ ${g.income.toFixed(2).replace('.',',')}</div>
-                <div class="val-red">-R$ ${g.expense.toFixed(2).replace('.',',')}</div>
+function renderCategoryBlock(label, groups, chartId) {
+    if (!groups.length) return '';
+    const total = groups.reduce((sum, group) => sum + group.total, 0);
+    const rows = groups.map(group => {
+        const percentage = total > 0 ? (group.total / total) * 100 : 0;
+        return `<div class="rel-item">
+            <div class="rel-item-icon" style="background:${escapeHtml(group.color)}">${escapeHtml(group.icon)}</div>
+            <div class="rel-item-name">${escapeHtml(group.name)}</div>
+            <div class="rel-item-vals">
+                <span class="rel-item-amount">${formatCurrency(group.total)}</span>
+                <span class="rel-item-pct">${percentage.toFixed(1)}%</span>
             </div>
         </div>`;
     }).join('');
 
-    container.innerHTML = `<div class="ent-sai-bars">${bars}</div>
-        <div class="ent-sai-legend">
-            <span><div class="dot" style="background:var(--green)"></div> Receitas</span>
-            <span><div class="dot" style="background:var(--red)"></div> Despesas</span>
+    return `<section class="rel-block">
+        <p class="rel-section-label">${label}</p>
+        <div class="report-category-content">
+            <div class="rel-list">${rows}<div class="rel-total"><span>Total</span><span>${formatCurrency(total)}</span></div></div>
+            <div class="rel-chart"><canvas id="${chartId}"></canvas></div>
+        </div>
+    </section>`;
+}
+
+function createDoughnutChart(canvasId, groups) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !groups.length) return null;
+    return new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: groups.map(group => group.name),
+            datasets: [{
+                data: groups.map(group => group.total),
+                backgroundColor: groups.map(group => group.color),
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '64%',
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } } }
+        }
+    });
+}
+
+function renderCategoryEvolution(container, transactions) {
+    const groups = buildFlowGroups(transactions, 'diario');
+    container.innerHTML = renderReportSummary(transactions) + `
+        <section class="report-chart-panel">
+            <div class="report-panel-heading">
+                <div><span>Evolução financeira</span><small>Saldo acumulado no mês selecionado</small></div>
+            </div>
+            <div class="report-chart-canvas"><canvas id="rel-category-evolution"></canvas></div>
+        </section>`;
+
+    requestAnimationFrame(() => {
+        const canvas = document.getElementById('rel-category-evolution');
+        if (!canvas) return;
+        relCategoryEvolutionChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: groups.map(group => group.label),
+                datasets: [{
+                    label: 'Saldo',
+                    data: groups.map(group => group.balance),
+                    borderColor: '#494FDF',
+                    backgroundColor: 'rgba(73,79,223,0.12)',
+                    fill: true,
+                    tension: 0.28,
+                    pointRadius: groups.length > 20 ? 1 : 3
+                }]
+            },
+            options: reportChartOptions()
+        });
+    });
+}
+
+function destroyReportCategoryCharts() {
+    [relChartExpense, relChartIncome, relCategoryEvolutionChart].forEach(chart => {
+        if (chart) chart.destroy();
+    });
+    relChartExpense = null;
+    relChartIncome = null;
+    relCategoryEvolutionChart = null;
+}
+
+function populateReportFilterOptions() {
+    const container = document.getElementById('rel-filter-categories');
+    if (!container) return;
+    const allSelected = reportFilters.categoryIds.size === 0;
+    container.innerHTML = categories.map(category => `
+        <label class="modal-check">
+            <input type="checkbox" value="${category.id}" ${allSelected || reportFilters.categoryIds.has(Number(category.id)) ? 'checked' : ''}>
+            <span>${escapeHtml(`${category.icon || ''} ${category.name}`.trim())}</span>
+        </label>`).join('');
+}
+
+function openReportFiltersModal() {
+    populateReportFilterOptions();
+    document.getElementById('rel-filter-income').checked = reportFilters.types.has('INCOME');
+    document.getElementById('rel-filter-expense').checked = reportFilters.types.has('EXPENSE');
+    document.getElementById('report-filters-modal').style.display = 'flex';
+}
+
+function closeReportFiltersModal() {
+    const modal = document.getElementById('report-filters-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function applyReportFilters() {
+    const types = new Set();
+    if (document.getElementById('rel-filter-income').checked) types.add('INCOME');
+    if (document.getElementById('rel-filter-expense').checked) types.add('EXPENSE');
+    if (!types.size) {
+        alert('Selecione receitas, despesas ou ambos.');
+        return;
+    }
+
+    const selectedCategories = Array.from(
+        document.querySelectorAll('#rel-filter-categories input:checked')
+    ).map(input => Number(input.value));
+    reportFilters.types = types;
+    reportFilters.categoryIds = selectedCategories.length === categories.length
+        ? new Set()
+        : new Set(selectedCategories);
+    closeReportFiltersModal();
+    loadRelatorios();
+}
+
+function clearReportFilters() {
+    reportFilters.types = new Set(['INCOME', 'EXPENSE']);
+    reportFilters.categoryIds = new Set();
+    populateReportFilterOptions();
+    document.getElementById('rel-filter-income').checked = true;
+    document.getElementById('rel-filter-expense').checked = true;
+    renderReportFilterBadge();
+}
+
+function renderReportFilterBadge() {
+    const badge = document.getElementById('rel-filter-count');
+    if (!badge) return;
+    let count = reportFilters.categoryIds.size;
+    if (reportFilters.types.size < 2) count += reportFilters.types.size;
+    badge.textContent = count ? String(count) : '';
+    badge.style.display = count ? 'inline-flex' : 'none';
+}
+
+// ===== RELATÓRIOS ENTRADAS x SAÍDAS =====
+function switchPeriod(period, button) {
+    document.querySelectorAll('.period-tab').forEach(tab => tab.classList.remove('active'));
+    button.classList.add('active');
+    currentPeriod = period;
+    renderFlowReport();
+}
+
+function getFlowTransactions() {
+    const selectedMonth = monthState.rel;
+    let scoped = allTransactions;
+    if (currentPeriod === 'diario' || currentPeriod === 'semanal') {
+        scoped = allTransactions.filter(transaction => {
+            const date = parseLocalDate(transaction.date);
+            return date.getMonth() === selectedMonth.getMonth() &&
+                date.getFullYear() === selectedMonth.getFullYear();
+        });
+    } else if (currentPeriod === 'mensal') {
+        scoped = allTransactions.filter(transaction =>
+            parseLocalDate(transaction.date).getFullYear() === selectedMonth.getFullYear()
+        );
+    }
+    return filterReportTransactions(scoped);
+}
+
+function createFlowGroup(label, key) {
+    return { label, key, income: 0, expense: 0, result: 0, balance: 0 };
+}
+
+function buildFlowGroups(transactions, period) {
+    const selectedMonth = monthState.rel;
+    let groups = [];
+
+    if (period === 'diario') {
+        const days = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
+        groups = Array.from({ length: days }, (_, index) =>
+            createFlowGroup(String(index + 1).padStart(2, '0') + '/' + String(selectedMonth.getMonth() + 1).padStart(2, '0'), index)
+        );
+        transactions.forEach(transaction => {
+            const date = parseLocalDate(transaction.date);
+            addTransactionToFlowGroup(groups[date.getDate() - 1], transaction);
+        });
+    } else if (period === 'semanal') {
+        const days = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).getDate();
+        const month = String(selectedMonth.getMonth() + 1).padStart(2, '0');
+        for (let startDay = 1; startDay <= days; startDay += 7) {
+            const endDay = Math.min(startDay + 6, days);
+            groups.push(createFlowGroup(
+                String(startDay).padStart(2, '0') + '/' + month + ' a ' + String(endDay).padStart(2, '0') + '/' + month,
+                groups.length
+            ));
+        }
+        transactions.forEach(transaction => {
+            const date = parseLocalDate(transaction.date);
+            addTransactionToFlowGroup(groups[Math.floor((date.getDate() - 1) / 7)], transaction);
+        });
+    } else if (period === 'mensal') {
+        groups = MONTHS.map((monthName, index) =>
+            createFlowGroup(String(index + 1).padStart(2, '0') + '/' + selectedMonth.getFullYear(), index)
+        );
+        transactions.forEach(transaction => {
+            const date = parseLocalDate(transaction.date);
+            addTransactionToFlowGroup(groups[date.getMonth()], transaction);
+        });
+    } else {
+        groups = buildAccumulatedGroups(transactions);
+    }
+
+    let runningBalance = 0;
+    groups.forEach(group => {
+        group.result = group.income - group.expense;
+        runningBalance += group.result;
+        group.balance = runningBalance;
+    });
+    return groups;
+}
+
+function buildAccumulatedGroups(transactions) {
+    if (!allTransactions.length) return [];
+    const dates = allTransactions.map(transaction => parseLocalDate(transaction.date)).sort((a, b) => a - b);
+    const start = new Date(dates[0].getFullYear(), dates[0].getMonth(), 1);
+    const latest = dates[dates.length - 1];
+    const now = new Date();
+    const endCandidate = latest > now ? latest : now;
+    const end = new Date(endCandidate.getFullYear(), endCandidate.getMonth(), 1);
+    const groups = [];
+    const byKey = new Map();
+
+    for (let cursor = new Date(start); cursor <= end; cursor.setMonth(cursor.getMonth() + 1)) {
+        const key = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0');
+        const group = createFlowGroup(String(cursor.getMonth() + 1).padStart(2, '0') + '/' + cursor.getFullYear(), key);
+        groups.push(group);
+        byKey.set(key, group);
+    }
+    transactions.forEach(transaction => {
+        const date = parseLocalDate(transaction.date);
+        const key = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+        addTransactionToFlowGroup(byKey.get(key), transaction);
+    });
+    return groups;
+}
+
+function addTransactionToFlowGroup(group, transaction) {
+    if (!group) return;
+    const amount = Number(transaction.amount || 0);
+    if (transaction.type === 'INCOME') group.income += amount;
+    if (transaction.type === 'EXPENSE') group.expense += amount;
+}
+
+function renderFlowReport() {
+    const container = document.getElementById('rel-ent-sai-content');
+    if (!container) return;
+    if (relFlowBarChart) relFlowBarChart.destroy();
+    if (relFlowEvolutionChart) relFlowEvolutionChart.destroy();
+
+    const transactions = getFlowTransactions();
+    const groups = buildFlowGroups(transactions, currentPeriod);
+    if (!groups.length) {
+        container.innerHTML = '<div class="page-empty-state"><div class="empty-icon-circle">!</div><p>Nenhum lançamento disponível</p></div>';
+        return;
+    }
+
+    const tableRows = groups.map(group => `<tr>
+        <td>${escapeHtml(group.label)}</td>
+        <td class="val-green">${formatCurrency(group.income)}</td>
+        <td class="val-red">${formatCurrency(group.expense)}</td>
+        <td class="val-purple">${formatCurrency(group.result)}</td>
+        <td>${formatCurrency(group.balance)}</td>
+    </tr>`).join('');
+
+    container.innerHTML = renderReportSummary(transactions) + `
+        <div class="report-charts-grid">
+            <section class="report-chart-panel">
+                <div class="report-panel-heading"><div><span>Entradas, saídas e resultado</span><small>Valores do período exibido</small></div></div>
+                <div class="report-chart-canvas"><canvas id="rel-flow-bars"></canvas></div>
+            </section>
+            <section class="report-chart-panel">
+                <div class="report-panel-heading"><div><span>Evolução do saldo</span><small>Saldo acumulado no período</small></div></div>
+                <div class="report-chart-canvas"><canvas id="rel-flow-evolution"></canvas></div>
+            </section>
+        </div>
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead><tr><th>Período</th><th>Entradas</th><th>Saídas</th><th>Resultado</th><th>Saldo</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
         </div>`;
+
+    requestAnimationFrame(() => createFlowCharts(groups));
+}
+
+function createFlowCharts(groups) {
+    const labels = groups.map(group => group.label);
+    const barCanvas = document.getElementById('rel-flow-bars');
+    const evolutionCanvas = document.getElementById('rel-flow-evolution');
+
+    if (barCanvas) {
+        relFlowBarChart = new Chart(barCanvas, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'Entradas', data: groups.map(group => group.income), backgroundColor: '#14A10C' },
+                    { label: 'Saídas', data: groups.map(group => group.expense), backgroundColor: '#CF0404' },
+                    { label: 'Resultado', data: groups.map(group => group.result), backgroundColor: '#494FDF' }
+                ]
+            },
+            options: reportChartOptions()
+        });
+    }
+    if (evolutionCanvas) {
+        relFlowEvolutionChart = new Chart(evolutionCanvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Saldo',
+                    data: groups.map(group => group.balance),
+                    borderColor: '#494FDF',
+                    backgroundColor: 'rgba(73,79,223,0.12)',
+                    fill: true,
+                    tension: 0.28,
+                    pointRadius: groups.length > 20 ? 1 : 3
+                }]
+            },
+            options: reportChartOptions()
+        });
+    }
+}
+
+function reportChartOptions() {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } }
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+            y: { beginAtZero: true, ticks: { callback: value => 'R$ ' + Number(value).toLocaleString('pt-BR') } }
+        }
+    };
 }
 
 // ===== PAGE TABS =====
@@ -1060,201 +1358,199 @@ function switchPageTab(section, tab, btn) {
     btn.classList.add('active');
     document.querySelectorAll(`#${sectionId}-section .page-tab-content`).forEach(c => c.classList.remove('active'));
     document.getElementById(`${section}-${tab}`).classList.add('active');
-    if (section === 'lim' && tab === 'entradas') renderIncomeLimits();
-    if (section === 'lim' && tab === 'categorias') renderLimites();
+    if (section === 'rel' && tab === 'categorias') {
+        renderCategoryReport(getReportMonthTransactions());
+    }
+    if (section === 'rel' && tab === 'entradas') {
+        renderFlowReport();
+    }
 }
 
-function switchRelSub(sub, btn) {
-    document.querySelectorAll('.rel-sub-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    relFilterMode = sub === 'filtros' ? 'expenses' : 'all';
-    loadRelatorios();
-}
 function switchRelView(view, btn) {
-    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.report-view-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     relViewMode = view;
-    loadRelatorios();
+    renderCategoryReport(getReportMonthTransactions());
 }
 
 // ===== LIMITES =====
-function renderActiveLimitTab() {
-    const activeTab = document.querySelector('#limites-section .page-tab-content.active');
-    if (activeTab && activeTab.id === 'lim-entradas') {
-        renderIncomeLimits();
-        return;
-    }
-    renderLimites();
-}
-
 async function renderLimites() {
     const container = document.getElementById('limites-list');
     if (!container) return;
 
-    const m = monthState.lim;
-    const monthKey = getMonthKey(m);
-    await fetchLimitsForMonth(monthKey);
-    const monthLimits = limits;
+    const selectedMonth = monthState.lim;
+    await fetchLimitsForMonth(getMonthKey(selectedMonth));
 
-    if (!monthLimits.length) {
-        container.innerHTML = `<div class="lim-empty">
-            <p id="lim-empty-msg">Nenhum limite de gasto definido em ${MONTHS[m.getMonth()]} ${m.getFullYear()}</p>
-            <button class="manage-btn" onclick="openLimitModal()">Definir limite de gastos</button>
-        </div>`;
+    if (!limits.length) {
+        container.innerHTML = '<div class="lim-empty">' +
+            '<p>Nenhum limite de gasto definido em ' +
+            escapeHtml(MONTHS[selectedMonth.getMonth()] + ' ' + selectedMonth.getFullYear()) +
+            '</p><button class="manage-btn" type="button" onclick="openLimitModal()">Definir limite de gastos</button></div>';
         return;
     }
 
-    container.innerHTML = monthLimits.map(l => {
-        const spent = Number(l.spent || 0);
-        const amount = Number(l.amount || 0);
-        const pct = Math.min(Number(l.percentage || 0), 100);
-        const pctStr = pct.toFixed(1);
-        const fillClass = pct >= 100 ? 'over' : pct >= 75 ? 'warn' : '';
-        const statusColor = pct >= 100 ? 'var(--red)' : pct >= 75 ? '#f59e0b' : 'var(--green)';
-        return `<div class="lim-item">
-            <div class="lim-item-header">
-                <div class="lim-item-name">${getCategoryEmoji(l.categoryKey)} ${escapeHtml(l.categoryName)}</div>
-                <div class="lim-item-vals">${formatCurrency(spent)} / ${formatCurrency(amount)}</div>
-            </div>
-            <div class="lim-progress-bar"><div class="lim-progress-fill ${fillClass}" style="width:${pctStr}%"></div></div>
-            <div style="display:flex;justify-content:space-between;margin-top:0.4rem;align-items:center;">
-                <span style="font-size:0.78rem;color:${statusColor};font-weight:600;">${pctStr}% utilizado</span>
-                <button onclick="removeLimit(${l.id})" style="background:none;border:none;cursor:pointer;font-size:0.78rem;color:#777;">x remover</button>
-            </div>
-        </div>`;
+    container.innerHTML = limits.map(function(limit) {
+        const used = getLimitUsed(limit);
+        const amount = Number(limit.amount || 0);
+        const remaining = getLimitRemaining(limit);
+        const percentage = Math.min(Number(limit.percentage || 0), 100);
+        const percentageLabel = percentage.toFixed(1);
+        const fillClass = percentage >= 100 ? 'over' : percentage >= 75 ? 'warn' : '';
+        const statusColor = percentage >= 100 ? 'var(--red)' : percentage >= 75 ? '#f59e0b' : 'var(--green)';
+        const category = findCategoryByName(limit.categoryName);
+        const categoryColor = category && category.color ? category.color : '#555';
+        const categoryIcon = category && category.icon ? category.icon : 'C';
+
+        return '<div class="lim-item">' +
+            '<div class="lim-item-header">' +
+                '<div class="lim-item-name"><span class="lim-category-icon" style="background:' +
+                    escapeHtml(categoryColor) + '">' + escapeHtml(categoryIcon) + '</span>' +
+                    escapeHtml(limit.categoryName) + '</div>' +
+                '<div class="lim-item-vals">' + formatCurrency(used) + ' / ' + formatCurrency(amount) + '</div>' +
+            '</div>' +
+            '<div class="lim-progress-bar"><div class="lim-progress-fill ' + fillClass +
+                '" style="width:' + percentageLabel + '%"></div></div>' +
+            '<div class="limit-metrics">' +
+                '<span class="limit-metric" style="color:' + statusColor + '">' +
+                    percentageLabel + '% utilizado</span>' +
+                '<span class="limit-metric">Restante: <strong>' + formatCurrency(remaining) + '</strong></span>' +
+            '</div>' +
+            '<div class="limit-actions">' +
+                '<button class="limit-edit-button" type="button" onclick="openLimitModal(' + limit.id + ')">Editar</button>' +
+                '<button class="limit-remove-button" type="button" onclick="removeLimit(' + limit.id + ')">Excluir</button>' +
+            '</div>' +
+        '</div>';
     }).join('');
-    container.innerHTML += `<button class="add-limit-btn" onclick="openLimitModal()">+ Adicionar limite</button>`;
+
+    container.innerHTML += '<button class="add-limit-btn" type="button" onclick="openLimitModal()">+ Adicionar limite</button>';
 }
 
 function getCurrentLimMonth() {
-    return `${MONTHS[monthState.lim.getMonth()]} ${monthState.lim.getFullYear()}`;
+    return MONTHS[monthState.lim.getMonth()] + ' ' + monthState.lim.getFullYear();
 }
 
-function getCategoryEmoji(cat) {
-    const map = {
-        alimentacao:'🍽', assinaturas:'📱', bares:'🍺', casa:'🏠', compras:'🛍',
-        dividas:'💳', educacao:'📚', familia:'👨‍👩‍👧', impostos:'🏛', investimentos:'📈',
-        lazer:'🎮', mercado:'🛒', outros:'📦', pets:'🐾', viagem:'✈',
-        salario:'⭐', 'salário':'⭐', emprestimos:'🏦', 'empréstimos':'🏦'
-    };
-    return map[cat] || '📦';
+function findCategoryByName(name) {
+    return categories.find(function(category) {
+        return normalizeText(category.name) === normalizeText(name);
+    });
 }
 
-function openLimitModal() { 
-    const limMonth = document.getElementById('lim-month');
-    const m = monthState.lim;
-    if (limMonth) limMonth.value = `${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-    populateLimitCategories();
-    document.getElementById('limit-modal').style.display = 'flex'; 
+function getLimitUsed(limit) {
+    return Number(limit.usedAmount ?? limit.spent ?? 0);
 }
-function closeLimitModal() { document.getElementById('limit-modal').style.display = 'none'; }
 
-function populateLimitCategories() {
+function getLimitRemaining(limit) {
+    return Number(limit.remaining ?? Math.max(Number(limit.amount || 0) - getLimitUsed(limit), 0));
+}
+
+function openLimitModal(limitId = null) {
+    editingLimitId = limitId;
+    const limit = limitId == null ? null : limits.find(function(item) { return item.id === limitId; });
+    const form = document.querySelector('#limit-modal form');
+    if (form) form.reset();
+
+    const selectedMonth = monthState.lim;
+    const monthInput = document.getElementById('lim-month');
+    monthInput.value = getMonthKey(selectedMonth);
+    populateLimitCategories(limit ? limit.categoryName : '');
+
+    document.getElementById('limit-modal-title').textContent =
+        limit ? 'Editar limite de gastos' : 'Adicionar limite de gastos';
+    document.getElementById('limit-submit-button').textContent =
+        limit ? 'Salvar alterações' : 'Salvar limite';
+
+    if (limit) {
+        document.getElementById('lim-value').value = Number(limit.amount || 0);
+        document.getElementById('lim-used-value').value = getLimitUsed(limit);
+        monthInput.value = limit.month;
+    }
+
+    document.getElementById('limit-modal').style.display = 'flex';
+}
+
+function closeLimitModal() {
+    const modal = document.getElementById('limit-modal');
+    if (modal) modal.style.display = 'none';
+    editingLimitId = null;
+}
+
+function populateLimitCategories(selectedName = '') {
     const select = document.getElementById('lim-category');
-    if (!select || !categories.length) return;
-    const expenseLike = categories.filter(c => normalizeText(c.name) !== 'salario');
-    select.innerHTML = expenseLike.map(c => `<option value="${normalizeText(c.name).replace(/\s+/g, '-')}">${escapeHtml(`${c.icon || ''} ${c.name}`.trim())}</option>`).join('');
+    if (!select) return;
+    if (!categories.length) {
+        select.innerHTML = '<option value="">Nenhuma categoria cadastrada</option>';
+        return;
+    }
+
+    select.innerHTML = categories.map(function(category) {
+        const selected = normalizeText(category.name) === normalizeText(selectedName) ? ' selected' : '';
+        return '<option value="' + category.id + '"' + selected + '>' +
+            escapeHtml(((category.icon || '') + ' ' + category.name).trim()) + '</option>';
+    }).join('');
 }
 
-async function handleAddLimit(e) {
-    e.preventDefault();
-    const categorySelect = document.getElementById('lim-category');
-    const categoryKey = categorySelect.value;
-    const categoryName = categorySelect.options[categorySelect.selectedIndex]?.text.replace(/^[^\wÀ-ÿ]+/, '').trim() || categoryKey;
+async function handleAddLimit(event) {
+    event.preventDefault();
+    const categoryId = Number(document.getElementById('lim-category').value);
+    const category = categories.find(function(item) { return item.id === categoryId; });
     const amount = parseFloat(document.getElementById('lim-value').value);
+    const usedAmount = parseFloat(document.getElementById('lim-used-value').value || '0');
     const month = document.getElementById('lim-month').value;
-    if (!categoryKey || !amount || !month) return;
+
+    if (!category || !Number.isFinite(amount) || !Number.isFinite(usedAmount) || !month) {
+        alert('Preencha todos os campos do limite.');
+        return;
+    }
+    if (amount <= 0 || usedAmount < 0 || usedAmount > amount) {
+        alert('O valor utilizado deve estar entre zero e o valor total do limite.');
+        return;
+    }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/users/${currentUser.id}/limits`, {
-            method: 'POST',
+        const endpoint = editingLimitId == null
+            ? API_BASE_URL + '/users/' + currentUser.id + '/limits'
+            : API_BASE_URL + '/users/' + currentUser.id + '/limits/' + editingLimitId;
+        const response = await fetch(endpoint, {
+            method: editingLimitId == null ? 'POST' : 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ categoryKey, categoryName, amount, month })
+            body: JSON.stringify({
+                categoryKey: normalizeText(category.name).replace(/\s+/g, '-'),
+                categoryName: category.name,
+                amount: amount,
+                usedAmount: usedAmount,
+                month: month,
+                limitType: 'EXPENSE'
+            })
         });
-        if (!res.ok) throw await res.json();
+        if (!response.ok) throw await response.json();
+
         closeLimitModal();
-        document.getElementById('limit-modal').querySelector('form').reset();
         await renderLimites();
         await fetchLimitsForMonth(getMonthKey(new Date()));
         renderLimitesCard();
         loadRelatorios();
-    } catch(err) {
-        alert('Erro: ' + (err.error || 'nao foi possivel salvar o limite'));
-    }
-}
-
-async function renderIncomeLimits() {
-    const container = document.getElementById('lim-entradas-list');
-    if (!container) return;
-
-    const monthKey = getMonthKey(monthState.lim);
-    await fetchIncomeLimitsForMonth(monthKey);
-
-    if (!incomeLimits.length) {
-        container.innerHTML = `<div class="lim-empty">
-            <p>Nenhuma meta de entrada definida em ${MONTHS[monthState.lim.getMonth()]} ${monthState.lim.getFullYear()}</p>
-        </div>`;
-    } else {
-        container.innerHTML = incomeLimits.map(l => {
-            const spent = Number(l.spent || 0);
-            const amount = Number(l.amount || 0);
-            const pct = Math.min(Number(l.percentage || 0), 100);
-            const fillClass = pct >= 100 ? '' : pct >= 75 ? 'warn' : '';
-            return `<div class="lim-item">
-                <div class="lim-item-header">
-                    <div class="lim-item-name">${escapeHtml(l.categoryName)}</div>
-                    <div class="lim-item-vals">${formatCurrency(spent)} / ${formatCurrency(amount)}</div>
-                </div>
-                <div class="lim-progress-bar"><div class="lim-progress-fill ${fillClass}" style="width:${pct.toFixed(1)}%"></div></div>
-                <div style="display:flex;justify-content:space-between;margin-top:0.4rem;align-items:center;">
-                    <span style="font-size:0.78rem;color:var(--green);font-weight:600;">${pct.toFixed(1)}% atingido</span>
-                    <button onclick="removeLimit(${l.id}, 'INCOME')" style="background:none;border:none;cursor:pointer;font-size:0.78rem;color:#777;">x remover</button>
-                </div>
-            </div>`;
-        }).join('');
-    }
-}
-
-async function handleAddIncomeLimit(e) {
-    e.preventDefault();
-    const categoryName = document.getElementById('lim-income-name').value.trim();
-    const amount = parseFloat(document.getElementById('lim-income-value').value);
-    const month = document.getElementById('lim-income-month').value || getMonthKey(monthState.lim);
-    if (!categoryName || !amount || !month) return;
-
-    try {
-        const categoryKey = normalizeText(categoryName).replace(/\s+/g, '-');
-        const res = await fetch(`${API_BASE_URL}/users/${currentUser.id}/limits`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ categoryKey, categoryName, amount, month, limitType: 'INCOME' })
-        });
-        if (!res.ok) throw await res.json();
-        e.target.reset();
-        document.getElementById('lim-income-month').value = getMonthKey(monthState.lim);
-        await renderIncomeLimits();
-        loadRelatorios();
         loadDashboard();
-    } catch(err) {
-        alert('Erro: ' + (err.error || 'nao foi possivel salvar a meta de entrada'));
+    } catch (error) {
+        alert('Erro: ' + (error.error || error.message || 'não foi possível salvar o limite'));
     }
 }
 
-async function removeLimit(id, type = 'EXPENSE') {
+async function removeLimit(id) {
     if (!confirm('Remover este limite?')) return;
     try {
-        const res = await fetch(`${API_BASE_URL}/users/${currentUser.id}/limits/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw await res.json();
-        if (type === 'INCOME') {
-            await renderIncomeLimits();
-        } else {
-            await renderLimites();
-            await fetchLimitsForMonth(getMonthKey(new Date()));
-            renderLimitesCard();
-        }
+        const response = await fetch(
+            API_BASE_URL + '/users/' + currentUser.id + '/limits/' + id,
+            { method: 'DELETE' }
+        );
+        if (!response.ok) throw await response.json();
+
+        await renderLimites();
+        await fetchLimitsForMonth(getMonthKey(new Date()));
+        renderLimitesCard();
         loadRelatorios();
-    } catch(err) {
-        alert('Erro: ' + (err.error || 'nao foi possivel remover o limite'));
+        loadDashboard();
+    } catch (error) {
+        alert('Erro: ' + (error.error || error.message || 'não foi possível remover o limite'));
     }
 }
 
@@ -1323,6 +1619,7 @@ function handleGlobalKeydown(e) {
     closeCardsModal();
     closeQuickModal();
     closeLimitModal();
+    closeReportFiltersModal();
 }
 
 document.addEventListener('click', e => {

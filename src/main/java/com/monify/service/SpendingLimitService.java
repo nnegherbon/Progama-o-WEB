@@ -1,18 +1,17 @@
 package com.monify.service;
 
 import com.monify.dto.SpendingLimitDTO;
+import com.monify.entity.Category;
 import com.monify.entity.SpendingLimit;
-import com.monify.entity.Transaction;
 import com.monify.entity.User;
 import com.monify.repository.SpendingLimitRepository;
-import com.monify.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -25,8 +24,8 @@ public class SpendingLimitService {
     private static final Pattern DIACRITICS = Pattern.compile("\\p{M}+");
 
     private final SpendingLimitRepository spendingLimitRepository;
-    private final TransactionRepository transactionRepository;
     private final UserService userService;
+    private final CategoryService categoryService;
 
     public List<SpendingLimitDTO> getLimits(Long userId, String month, SpendingLimit.LimitType type) {
         userService.getUserById(userId);
@@ -40,89 +39,118 @@ public class SpendingLimitService {
         }
 
         return limits.stream()
-                .map(limit -> toDTO(limit, calculateSpent(userId, limit)))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
-    public SpendingLimitDTO saveLimit(Long userId, SpendingLimitDTO dto) {
+    public SpendingLimitDTO createLimit(Long userId, SpendingLimitDTO dto) {
         User user = userService.getUserById(userId);
-        SpendingLimit.LimitType limitType = dto.getLimitType() != null ? dto.getLimitType() : SpendingLimit.LimitType.EXPENSE;
-        SpendingLimit limit = spendingLimitRepository
-                .findByUserIdAndCategoryKeyAndMonthAndLimitType(userId, dto.getCategoryKey(), dto.getMonth(), limitType)
-                .orElseGet(() -> SpendingLimit.builder()
-                        .user(user)
-                        .categoryKey(dto.getCategoryKey())
-                        .month(dto.getMonth())
-                        .limitType(limitType)
-                        .build());
+        SpendingLimit.LimitType limitType = dto.getLimitType() != null
+                ? dto.getLimitType()
+                : SpendingLimit.LimitType.EXPENSE;
+        Category category = getCategory(dto);
+        String categoryKey = normalizeKey(category.getName());
 
-        limit.setCategoryName(dto.getCategoryName().trim());
-        limit.setAmount(dto.getAmount());
-        limit.setLimitType(limitType);
+        spendingLimitRepository
+                .findByUserIdAndCategoryKeyAndMonthAndLimitType(userId, categoryKey, dto.getMonth(), limitType)
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Limite ja cadastrado para esta categoria e mes");
+                });
 
-        SpendingLimit saved = spendingLimitRepository.save(limit);
-        return toDTO(saved, calculateSpent(userId, saved));
+        SpendingLimit limit = SpendingLimit.builder()
+                .user(user)
+                .categoryKey(categoryKey)
+                .categoryName(category.getName())
+                .month(dto.getMonth())
+                .limitType(limitType)
+                .build();
+        applyValues(limit, dto, category, limitType);
+
+        return toDTO(spendingLimitRepository.save(limit));
+    }
+
+    public SpendingLimitDTO updateLimit(Long userId, Long id, SpendingLimitDTO dto) {
+        SpendingLimit limit = getOwnedLimit(userId, id);
+        SpendingLimit.LimitType limitType = dto.getLimitType() != null
+                ? dto.getLimitType()
+                : limit.getLimitType();
+        Category category = getCategory(dto);
+        String categoryKey = normalizeKey(category.getName());
+
+        spendingLimitRepository
+                .findByUserIdAndCategoryKeyAndMonthAndLimitType(userId, categoryKey, dto.getMonth(), limitType)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Limite ja cadastrado para esta categoria e mes");
+                });
+
+        applyValues(limit, dto, category, limitType);
+        return toDTO(spendingLimitRepository.save(limit));
     }
 
     public void deleteLimit(Long userId, Long id) {
+        spendingLimitRepository.delete(getOwnedLimit(userId, id));
+    }
+
+    private void applyValues(
+            SpendingLimit limit,
+            SpendingLimitDTO dto,
+            Category category,
+            SpendingLimit.LimitType limitType) {
+        BigDecimal amount = dto.getAmount();
+        BigDecimal usedAmount = dto.getUsedAmount() != null ? dto.getUsedAmount() : BigDecimal.ZERO;
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Valor limite deve ser maior que zero");
+        }
+        if (usedAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Valor utilizado nao pode ser negativo");
+        }
+        if (usedAmount.compareTo(amount) > 0) {
+            throw new RuntimeException("Valor utilizado nao pode ultrapassar o limite");
+        }
+
+        limit.setCategoryKey(normalizeKey(category.getName()));
+        limit.setCategoryName(category.getName());
+        limit.setMonth(dto.getMonth());
+        limit.setAmount(amount);
+        limit.setUsedAmount(usedAmount);
+        limit.setLimitType(limitType != null ? limitType : SpendingLimit.LimitType.EXPENSE);
+    }
+
+    private SpendingLimit getOwnedLimit(Long userId, Long id) {
         SpendingLimit limit = spendingLimitRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Limite nao encontrado"));
         if (!limit.getUser().getId().equals(userId)) {
             throw new RuntimeException("Limite nao pertence ao usuario");
         }
-        spendingLimitRepository.delete(limit);
+        return limit;
     }
 
-    private BigDecimal calculateSpent(Long userId, SpendingLimit limit) {
-        String[] parts = limit.getMonth().split("-");
-        int year = Integer.parseInt(parts[0]);
-        int month = Integer.parseInt(parts[1]);
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-
-        return transactionRepository.findByUserIdAndDateRange(userId, startDate, endDate)
-                .stream()
-                .filter(transaction -> transaction.getType() == toTransactionType(limit.getLimitType()))
-                .filter(transaction -> matchesCategory(transaction, limit))
-                .map(Transaction::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private Transaction.TransactionType toTransactionType(SpendingLimit.LimitType limitType) {
-        return limitType == SpendingLimit.LimitType.INCOME
-                ? Transaction.TransactionType.INCOME
-                : Transaction.TransactionType.EXPENSE;
-    }
-
-    private boolean matchesCategory(Transaction transaction, SpendingLimit limit) {
-        if (transaction.getCategory() == null || transaction.getCategory().getName() == null) {
-            return false;
+    private Category getCategory(SpendingLimitDTO dto) {
+        if (dto.getCategoryName() == null || dto.getCategoryName().isBlank()) {
+            throw new RuntimeException("Categoria e obrigatoria");
         }
-        String transactionCategory = normalize(transaction.getCategory().getName());
-        String limitKey = normalize(limit.getCategoryKey());
-        String limitName = normalize(limit.getCategoryName());
-        return transactionCategory.contains(limitKey)
-                || transactionCategory.contains(limitName)
-                || limitKey.contains(transactionCategory)
-                || limitName.contains(transactionCategory);
+        return categoryService.getCategoryByName(dto.getCategoryName().trim());
     }
 
-    private String normalize(String value) {
-        if (value == null) {
-            return "";
-        }
+    private String normalizeKey(String value) {
         String normalized = Normalizer.normalize(value, Normalizer.Form.NFD);
         return DIACRITICS.matcher(normalized)
                 .replaceAll("")
                 .toLowerCase()
-                .trim();
+                .trim()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-|-$)", "");
     }
 
-    private SpendingLimitDTO toDTO(SpendingLimit limit, BigDecimal spent) {
+    private SpendingLimitDTO toDTO(SpendingLimit limit) {
+        BigDecimal amount = limit.getAmount() != null ? limit.getAmount() : BigDecimal.ZERO;
+        BigDecimal usedAmount = limit.getUsedAmount() != null ? limit.getUsedAmount() : BigDecimal.ZERO;
+        BigDecimal remaining = amount.subtract(usedAmount).max(BigDecimal.ZERO);
         BigDecimal percentage = BigDecimal.ZERO;
-        if (limit.getAmount() != null && limit.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-            percentage = spent.multiply(BigDecimal.valueOf(100))
-                    .divide(limit.getAmount(), 2, RoundingMode.HALF_UP);
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+            percentage = usedAmount.multiply(BigDecimal.valueOf(100))
+                    .divide(amount, 2, RoundingMode.HALF_UP);
         }
 
         return SpendingLimitDTO.builder()
@@ -130,9 +158,13 @@ public class SpendingLimitService {
                 .categoryKey(limit.getCategoryKey())
                 .categoryName(limit.getCategoryName())
                 .month(limit.getMonth())
-                .amount(limit.getAmount())
-                .limitType(limit.getLimitType() != null ? limit.getLimitType() : SpendingLimit.LimitType.EXPENSE)
-                .spent(spent)
+                .amount(amount)
+                .usedAmount(usedAmount)
+                .limitType(limit.getLimitType() != null
+                        ? limit.getLimitType()
+                        : SpendingLimit.LimitType.EXPENSE)
+                .spent(usedAmount)
+                .remaining(remaining)
                 .percentage(percentage)
                 .build();
     }

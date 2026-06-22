@@ -34,7 +34,19 @@ public class SpendingLimitController {
     @PostMapping
     public ResponseEntity<?> saveLimit(@PathVariable Long userId, @Valid @RequestBody SpendingLimitDTO limitDTO) {
         try {
-            return ResponseEntity.status(HttpStatus.CREATED).body(spendingLimitService.saveLimit(userId, limitDTO));
+            return ResponseEntity.status(HttpStatus.CREATED).body(spendingLimitService.createLimit(userId, limitDTO));
+        } catch (RuntimeException e) {
+            return error(e, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateLimit(
+            @PathVariable Long userId,
+            @PathVariable Long id,
+            @Valid @RequestBody SpendingLimitDTO limitDTO) {
+        try {
+            return ResponseEntity.ok(spendingLimitService.updateLimit(userId, id, limitDTO));
         } catch (RuntimeException e) {
             return error(e, HttpStatus.BAD_REQUEST);
         }

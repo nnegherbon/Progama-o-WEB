@@ -255,8 +255,6 @@
                     <button class="btn btn-primary-dark compact-action" onclick="openTransactionModalFromLancamentos('INCOME')" type="button">Receita</button>
                     <button class="btn btn-primary-dark compact-action" onclick="openTransactionModalFromLancamentos('EXPENSE')" type="button">Despesa</button>
                     <button class="btn btn-primary-dark compact-action" title="Pesquisar" onclick="toggleLancSearch()" type="button">Pesquisar</button>
-                    <button class="icon-btn-dark" title="Filtros">⊟</button>
-                    <button class="icon-btn-dark" title="Mais opções">⋮</button>
                 </div>
             </div>
 
@@ -265,47 +263,15 @@
                 <div class="filter-dropdown">
                     <button class="filter-btn" onclick="toggleDropdown('tipo-dd')">Tipo ▾</button>
                     <div class="dropdown-menu" id="tipo-dd">
-                        <label><input type="checkbox" value="receitas-recebidas"> Receitas recebidas</label>
-                        <label><input type="checkbox" value="receitas"> Receitas</label>
-                        <label><input type="checkbox" value="receitas-nao-recebidas"> Receitas não recebidas</label>
-                        <label><input type="checkbox" value="despesas"> Despesas</label>
-                        <label><input type="checkbox" value="despesas-pagas"> Despesas pagas</label>
-                        <label><input type="checkbox" value="fixos"> Lançamentos fixos</label>
-                        <label><input type="checkbox" value="parcelados"> Lançamentos parcelados</label>
-                    </div>
-                </div>
-                <div class="filter-dropdown">
-                    <button class="filter-btn" onclick="toggleDropdown('contas-dd')">Contas e Cartões ▾</button>
-                    <div class="dropdown-menu" id="contas-dd">
-                        <label><input type="checkbox" value="conta-corrente"> Conta corrente</label>
-                        <label><input type="checkbox" value="poupanca"> Poupança</label>
-                        <label><input type="checkbox" value="cartao-credito"> Cartão de crédito</label>
-                        <label><input type="checkbox" value="cartao-debito"> Cartão de débito</label>
+                        <label><input type="checkbox" value="type:INCOME"> Receitas</label>
+                        <label><input type="checkbox" value="type:EXPENSE"> Despesas</label>
                     </div>
                 </div>
                 <div class="filter-dropdown">
                     <button class="filter-btn" onclick="toggleDropdown('cat-dd')">Categorias ▾</button>
                     <div class="dropdown-menu dropdown-wide" id="cat-dd">
-                        <p class="dd-group-label">Despesas</p>
-                        <label><input type="checkbox" value="alimentacao"> Alimentação</label>
-                        <label><input type="checkbox" value="assinaturas"> Assinaturas e serviços</label>
-                        <label><input type="checkbox" value="bares"> Bares e restaurantes</label>
-                        <label><input type="checkbox" value="casa"> Casa</label>
-                        <label><input type="checkbox" value="compras"> Compras</label>
-                        <label><input type="checkbox" value="dividas"> Dívidas e empréstimos</label>
-                        <label><input type="checkbox" value="educacao"> Educação</label>
-                        <label><input type="checkbox" value="familia"> Família e filhos</label>
-                        <label><input type="checkbox" value="impostos"> Impostos e taxas</label>
-                        <label><input type="checkbox" value="investimentos-d"> Investimentos</label>
-                        <label><input type="checkbox" value="lazer"> Lazer e hobbies</label>
-                        <label><input type="checkbox" value="mercado"> Mercado</label>
-                        <label><input type="checkbox" value="outros-d"> Outros</label>
-                        <label><input type="checkbox" value="pets"> Pets</label>
-                        <p class="dd-group-label" style="margin-top:0.5rem;">Receitas</p>
-                        <label><input type="checkbox" value="emprestimos"> Empréstimos</label>
-                        <label><input type="checkbox" value="investimentos-r"> Investimentos</label>
-                        <label><input type="checkbox" value="outras-receitas"> Outras receitas</label>
-                        <label><input type="checkbox" value="salario"> Salário</label>
+                        <p class="dd-group-label">Categorias cadastradas</p>
+                        <p class="filter-loading">Carregando categorias...</p>
                     </div>
                 </div>
                 <button class="filter-search-btn">🔍</button>
@@ -366,11 +332,10 @@
             <!-- Categorias tab -->
             <div id="rel-categorias" class="page-tab-content active">
                 <div class="rel-toolbar">
-                    <button class="rel-sub-btn active" onclick="switchRelSub('categorias',this)">Categorias</button>
-                    <button class="rel-sub-btn" onclick="switchRelSub('filtros',this)">⊟ Filtros</button>
-                    <div class="rel-view-toggle">
-                        <button class="view-btn active" onclick="switchRelView('list',this)" title="Lista">☰</button>
-                        <button class="view-btn" onclick="switchRelView('chart',this)" title="Gráfico">📊</button>
+                    <button id="rel-filter-button" class="rel-filter-button" onclick="openReportFiltersModal()" type="button">Filtros <span id="rel-filter-count"></span></button>
+                    <div class="report-view-tabs" aria-label="Visualização do relatório">
+                        <button class="report-view-tab active" onclick="switchRelView('categories',this)" type="button">Categorias</button>
+                        <button class="report-view-tab" onclick="switchRelView('evolution',this)" type="button">Evolução</button>
                     </div>
                 </div>
 
@@ -391,9 +356,6 @@
                         <button class="period-tab" onclick="switchPeriod('mensal',this)">mensal</button>
                         <button class="period-tab" onclick="switchPeriod('acumulado',this)">acumulado</button>
                     </div>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="considerar-nao-pagas"> Considerar movimentações não pagas
-                    </label>
                 </div>
                 <div id="rel-ent-sai-content">
                     <div class="page-empty-state">
@@ -417,11 +379,6 @@
                 </div>
             </div>
 
-            <div class="page-tabs">
-                <button class="page-tab active" onclick="switchPageTab('lim','categorias',this)">Categorias</button>
-                <button class="page-tab" onclick="switchPageTab('lim','entradas',this)">Entradas x Saídas</button>
-            </div>
-
             <div id="lim-categorias" class="page-tab-content active">
                 <div id="limites-list">
                     <div class="lim-empty">
@@ -431,28 +388,6 @@
                 </div>
             </div>
 
-            <div id="lim-entradas" class="page-tab-content">
-                <form class="inline-limit-form" onsubmit="handleAddIncomeLimit(event)">
-                    <div class="form-group">
-                        <label>Entrada</label>
-                        <input type="text" id="lim-income-name" placeholder="Salário, freelance..." required>
-                    </div>
-                    <div class="form-group">
-                        <label>Valor esperado (R$)</label>
-                        <input type="number" id="lim-income-value" step="0.01" min="0" placeholder="0,00" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Mês</label>
-                        <input type="month" id="lim-income-month" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary-dark">Salvar entrada</button>
-                </form>
-                <div id="lim-entradas-list"></div>
-                <div class="page-empty-state">
-                    <div class="empty-icon-circle">!</div>
-                    <p>Nenhum dado disponível</p>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -500,35 +435,21 @@
 <div id="limit-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
     <div class="modal-box">
         <div class="modal-header">
-            <h3>Definir Limite de Gastos</h3>
+            <h3 id="limit-modal-title">Definir Limite de Gastos</h3>
             <button class="modal-close" onclick="closeLimitModal()">✕</button>
         </div>
         <form onsubmit="handleAddLimit(event)">
             <div class="form-group">
                 <label>Categoria</label>
-                <select id="lim-category">
-                    <optgroup label="Despesas">
-                        <option value="alimentacao">🍽 Alimentação</option>
-                        <option value="assinaturas">📱 Assinaturas e serviços</option>
-                        <option value="bares">🍺 Bares e restaurantes</option>
-                        <option value="casa">🏠 Casa</option>
-                        <option value="compras">🛍 Compras</option>
-                        <option value="dividas">💳 Dívidas e empréstimos</option>
-                        <option value="educacao">📚 Educação</option>
-                        <option value="familia">👨‍👩‍👧 Família e filhos</option>
-                        <option value="impostos">🏛 Impostos e taxas</option>
-                        <option value="investimentos">📈 Investimentos</option>
-                        <option value="lazer">🎮 Lazer e hobbies</option>
-                        <option value="mercado">🛒 Mercado</option>
-                        <option value="outros">📦 Outros</option>
-                        <option value="pets">🐾 Pets</option>
-                        <option value="viagem">✈ Viagem</option>
-                    </optgroup>
-                </select>
+                <select id="lim-category" required></select>
             </div>
             <div class="form-group">
                 <label>Valor limite (R$)</label>
                 <input type="number" id="lim-value" step="0.01" min="0" placeholder="0,00" required>
+            </div>
+            <div class="form-group">
+                <label>Valor utilizado (R$)</label>
+                <input type="number" id="lim-used-value" step="0.01" min="0" placeholder="0,00" required>
             </div>
             <div class="form-group">
                 <label>Mês de referência</label>
@@ -536,9 +457,32 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeLimitModal()">Cancelar</button>
-                <button type="submit" class="btn btn-primary-dark">Salvar limite</button>
+                <button type="submit" class="btn btn-primary-dark" id="limit-submit-button">Salvar limite</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ===== REPORT FILTERS MODAL ===== -->
+<div id="report-filters-modal" class="modal-overlay" style="display:none;" onclick="closeModalOutside(event)">
+    <div class="modal-box report-filter-modal">
+        <div class="modal-header">
+            <h3>Filtrar relatórios</h3>
+            <button class="modal-close" onclick="closeReportFiltersModal()" type="button">x</button>
+        </div>
+        <div class="report-filter-section">
+            <span class="report-filter-title">Tipos</span>
+            <label class="modal-check"><input type="checkbox" id="rel-filter-income" value="INCOME"> Receitas</label>
+            <label class="modal-check"><input type="checkbox" id="rel-filter-expense" value="EXPENSE"> Despesas</label>
+        </div>
+        <div class="report-filter-section">
+            <span class="report-filter-title">Categorias cadastradas</span>
+            <div id="rel-filter-categories" class="report-filter-categories"></div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="clearReportFilters()">Limpar</button>
+            <button type="button" class="btn btn-primary-dark" onclick="applyReportFilters()">Aplicar filtros</button>
+        </div>
     </div>
 </div>
 
